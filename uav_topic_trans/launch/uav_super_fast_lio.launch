@@ -1,0 +1,12 @@
+<launch>
+  <!-- 启动 Fast-LIO -->
+  <include file="$(find fast_lio)/launch/mapping_mid360.launch" />
+
+  <!-- 启动 UAV Topic 转换节点 -->
+  <node
+    pkg="uav_topic_trans"
+    type="odometry_to_px4_node"
+    name="odometry_to_px4_node"
+    output="screen"
+  />
+</launch>

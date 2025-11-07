@@ -1,0 +1,22 @@
+<launch>
+  <param name="cloud1_topic" value="/livox/lidar_192_168_1_xx1" />
+  <param name="cloud2_topic" value="/livox/lidar_192_168_1_xx2" />
+
+  <!-- cloud1 transform (radians, meters) -->
+  <param name="roll1"  value="0.0" />
+  <param name="pitch1" value="0.0" />
+  <param name="yaw1"   value="0.0" />
+  <param name="tx1"    value="0.0" />
+  <param name="ty1"    value="0.0" />
+  <param name="tz1"    value="0.0" />
+
+  <!-- cloud2 transform (radians, meters) -->
+  <param name="roll2"  value="0.0" />
+  <param name="pitch2" value="0.0" />
+  <param name="yaw2"   value="0.0" />
+  <param name="tx2"    value="0.0" />
+  <param name="ty2"    value="0.0" />
+  <param name="tz2"    value="0.0" />
+
+  <node name="merge_cloud_node" pkg="uav_util" type="merge_cloud_node" output="screen" />
+</launch>

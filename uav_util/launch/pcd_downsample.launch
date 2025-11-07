@@ -1,0 +1,11 @@
+<launch>
+    <!-- Declare argument -->
+    <arg name="pcd_path" default=""/>
+    <arg name="leaf_size" default="0.1"/>
+
+    <!-- Pass argument to node parameter -->
+    <node pkg="uav_util" type="pcd_downsample_node" name="pcd_downsample_node" output="screen">
+        <param name="pcd_path" value="$(arg pcd_path)"/>
+        <param name="leaf_size" value="$(arg leaf_size)"/>
+    </node>
+</launch>

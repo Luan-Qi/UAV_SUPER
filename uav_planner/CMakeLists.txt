@@ -1,0 +1,52 @@
+cmake_minimum_required(VERSION 3.0.2)
+project(uav_planner)
+
+set(octomap_DIR /home/orangepi/ros_catkin_ws/install_isolated/share/octomap)
+
+find_package(catkin REQUIRED COMPONENTS
+  geometry_msgs
+  nav_msgs
+  roscpp
+  std_msgs
+  octomap
+  octomap_msgs
+  visualization_msgs
+  sensor_msgs
+  pcl_ros
+  pcl_conversions
+  Eigen3
+)
+
+###################################
+## catkin specific configuration ##
+###################################
+## The catkin_package macro generates cmake config files for your package
+## Declare things to be passed to dependent projects
+## INCLUDE_DIRS: uncomment this if your package contains header files
+## LIBRARIES: libraries you create in this project that dependent projects also need
+## CATKIN_DEPENDS: catkin_packages dependent projects also need
+## DEPENDS: system dependencies of this project that dependent projects also need
+catkin_package(
+#  INCLUDE_DIRS include
+#  LIBRARIES uav_planner
+#  CATKIN_DEPENDS geometry_msg nav_msgs roscpp std_msgs
+#  DEPENDS system_lib
+)
+
+include_directories(
+  include/uav_planner
+  ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
+)
+
+add_executable(astar_planner_node src/astar/astar_planner_node.cpp src/astar/astar_searcher.cpp src/astar/astar_visualization.cpp)
+target_link_libraries(astar_planner_node ${catkin_LIBRARIES})
+add_dependencies(astar_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(transform_path src/transform_path.cpp)
+target_link_libraries(transform_path ${catkin_LIBRARIES})
+add_dependencies(transform_path ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(path_follower src/simple_path_follower.cpp)
+target_link_libraries(path_follower ${catkin_LIBRARIES})
+add_dependencies(path_follower ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

@@ -1,0 +1,14 @@
+<launch>
+  <!-- 启动 MAVROS -->
+  <include file="$(find mavros)/launch/px4.launch">
+    <!-- 如果需要，可以在这里传入参数 -->
+    <!-- <arg name="fcu_url" value="/dev/ttyUSB0:921600" /> -->
+  </include>
+
+  <!-- 启动 Livox MID360 驱动 -->
+  <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch">
+    <!-- 例如可在此修改 frame_id 或配置文件路径 -->
+    <!-- <arg name="xfer_format" value="1" /> -->
+  </include>
+
+</launch>

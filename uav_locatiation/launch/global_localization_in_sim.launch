@@ -1,0 +1,62 @@
+<launch>
+    <!--<remap from="/map_generator/global_cloud" to="/map"/>-->
+    <remap from="/Odometry" to="/drone_0_visual_slam/odom"/>
+    <remap from="/cloud_registered" to="/drone_0_pcl_render_node/cloud"/>
+
+    <arg name="rviz" default="true" />
+
+    <arg name="map_voxel_size" default="0.2" />
+    <arg name="scan_voxel_size" default="0.1" />
+    <arg name="freq_localization" default="0.5" />
+    <arg name="localization_th" default="0.95" />
+    <arg name="fov" default="2.35" />
+    <arg name="fov_far" default="5.0" />
+    <arg name="map_in_topic" default="/map" />
+    
+    <arg name="global_start_topic" default="/start_pose" />
+    <arg name="global_locatiation_hz" default="30.0" />
+    <param name="takeoff_height" value="0.0" />
+
+    <arg name="init_x" default="0.0" />
+    <arg name="init_y" default="0.0" />
+    <arg name="init_z" default="0.0" />
+    <arg name="init_roll" default="0.0" />
+    <arg name="init_pitch" default="0.0" />
+    <arg name="init_yaw" default="0.0" />
+
+
+    <node pkg="uav_locatiation" type="fast_lio_localization" name="fast_lio_localization" output="screen" >
+        <param name="map_voxel_size" value="$(arg map_voxel_size)" />
+        <param name="scan_voxel_size" value="$(arg scan_voxel_size)" />
+        <param name="freq_localization" value="$(arg freq_localization)" />
+        <param name="localization_th" value="$(arg localization_th)" />
+        <param name="fov" value="$(arg fov)" />
+        <param name="fov_far" value="$(arg fov_far)" />
+        <param name="map_in_topic" value="$(arg map_in_topic)" />
+    </node>
+
+    <node pkg="uav_locatiation" type="publish_initial_pose" name="publish_initial_pose" output="screen" 
+        args="$(arg init_x) $(arg init_y) $(arg init_z) $(arg init_roll) $(arg init_pitch) $(arg init_yaw) " />
+    
+    <node pkg="uav_locatiation" type="transform_fusion" name="transform_fusion" output="screen" >
+        <param name="global_start_topic" value="$(arg global_start_topic)" />
+        <param name="global_locatiation_hz" value="$(arg global_locatiation_hz)" />
+        <!-- <param name="takeoff_height" value="$(arg takeoff_height)" /> -->
+    </node>
+
+    <include file="$(find uav_planner)/launch/octomap_publisher.launch" />
+    <include file="$(find uav_planner)/launch/astar_planner.launch" />
+
+    <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
+        <param name="goal_distance_threshold" value="0.5"/>
+        <param name="path_step" value="5"/>
+        <param name="publish_rate" value="5.0"/>
+    </node>
+
+    <include file="$(find ego_planner)/launch/single_run_in_sim_need_map.launch" />
+
+    <group if="$(arg rviz)">
+	    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz1" 
+              args="-d $(find uav_locatiation)/rviz/global_planner.rviz" />
+	</group>
+</launch>

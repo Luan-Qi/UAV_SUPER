@@ -1,0 +1,11 @@
+<launch>
+    <arg name="x" default="0.0" />
+    <arg name="y" default="0.0" />
+    <arg name="z" default="0.0" />
+    <arg name="yaw" default="0" />
+    <arg name="pose_topic" default="/move_base_simple/goal" />
+
+    <node pkg="uav_px4_ctrl" type="pub_goal" name="pub_goal" output="screen" 
+          args="$(arg x) $(arg y) $(arg z) $(arg yaw) $(arg pose_topic)" />
+</launch>
+

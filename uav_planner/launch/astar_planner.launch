@@ -1,0 +1,35 @@
+<launch>
+    <arg name="octomap_topic" default="/octomap_full" />
+    <arg name="start_pose_topic" default="/start_pose" />
+    <arg name="goal_pose_topic" default="/goal_pose" />
+    <arg name="enable_obstacle_show" default="true" />
+    <arg name="inflater_size" default="2" />
+
+    <arg name="global_path_topic" default="/global_path" />
+    <arg name="local_path_topic" default="/local_path" />
+    <arg name="map_to_odom_topic" default="/map_to_odom" />
+
+    <node pkg="uav_planner" type="astar_planner_node" name="astar_planner_node" output="screen">
+        <param name="octomap_topic" value="$(arg octomap_topic)" />
+        <param name="start_pose_topic" value="$(arg start_pose_topic)" />
+        <param name="goal_pose_topic" value="$(arg goal_pose_topic)" />
+        <param name="global_path_topic" value="$(arg global_path_topic)" />
+        <param name="enable_obstacle_show" value="$(arg enable_obstacle_show)" />
+        <param name="inflater_size" value="$(arg inflater_size)" />
+    </node>
+
+    <node pkg="uav_planner" type="transform_path" name="transform_path" output="screen">
+        <param name="global_path_topic" value="$(arg global_path_topic)" />
+        <param name="local_path_topic" value="$(arg local_path_topic)" />
+        <param name="map_to_odom_topic" value="$(arg map_to_odom_topic)" />
+    </node>
+
+    <!--
+    <node pkg="uav_px4_ctrl" type="pub_goal" name="pub_goal_1" output="screen" 
+        args="0.0 0.0 1 0 /start_pose" />
+    
+    <node pkg="uav_px4_ctrl" type="pub_goal" name="pub_goal_2" output="screen" 
+          args="53.0 -45.0 1 0 /move_base_simple/goal" />
+    -->
+
+</launch>
