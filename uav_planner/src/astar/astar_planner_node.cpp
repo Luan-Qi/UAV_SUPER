@@ -185,9 +185,10 @@ int main(int argc, char **argv)
 
                 path_pub.publish(path_msg);
                 ROS_INFO("[astar] Published path with %zu points.", path_msg.poses.size());
+                start_pose = goal_pose;
             }
 
-            have_start = have_goal = false;  // 等待下次规划
+            have_goal = false;  // 等待下次规划
             astar.resetUsedGrids();
             ROS_INFO(" ");
             ROS_INFO("[astar] Waiting for %s%s%s", have_start ? "" : "start_pose,", have_goal ? "" : "goal_pose,", have_octomap ? "" : "octomap");

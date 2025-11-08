@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <regex>
 
 class WaypointPublisher
 {
@@ -12,32 +13,15 @@ public:
     {
         nh.param("pose_topic", pose_topic_, std::string("/mavros/local_position/pose"));
         nh.param("odom_topic", odom_topic_, std::string(""));
+        nh.param("goal_topic", goal_topic_, std::string("/move_base_simple/goal"));
         nh.param("distance_threshold", distance_threshold_, 0.2);
         nh.param("wait_time", wait_time_, 0.0);
         nh.param("start_delay", start_delay_, 3.0);
         nh.param("topic_timeout", topic_timeout_, 3.0);
 
-        XmlRpc::XmlRpcValue waypoint_list;
-        if (nh.getParam("waypoints", waypoint_list))
-        {
-            if (waypoint_list.getType() == XmlRpc::XmlRpcValue::TypeArray)
-            {
-                for (int i = 0; i < waypoint_list.size(); ++i)
-                {
-                    XmlRpc::XmlRpcValue p = waypoint_list[i];
-                    if (p.getType() == XmlRpc::XmlRpcValue::TypeArray && p.size() == 3)
-                    {
-                        geometry_msgs::PoseStamped wp;
-                        wp.header.frame_id = "map";
-                        wp.pose.position.x = static_cast<double>(p[0]);
-                        wp.pose.position.y = static_cast<double>(p[1]);
-                        wp.pose.position.z = static_cast<double>(p[2]);
-                        wp.pose.orientation.w = 1.0;
-                        waypoints_.push_back(wp);
-                    }
-                }
-            }
-        }
+        std::string waypoint_str;
+        nh.param("waypoints", waypoint_str, std::string("[[0,0,1.0],[2,0,1.0]]"));
+        parseWaypointString(waypoint_str);
 
         if (waypoints_.empty())
         {
@@ -55,7 +39,7 @@ public:
                      waypoints_[i].pose.position.z);
         }
 
-        goal_pub_ = nh.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 10);
+        goal_pub_ = nh.advertise<geometry_msgs::PoseStamped>(goal_topic_, 10);
 
         if (!odom_topic_.empty())
         {
@@ -73,6 +57,28 @@ public:
         current_wp_idx_ = 0;
         reached_ = false;
         last_pose_time_ = ros::Time(0);
+    }
+
+    void parseWaypointString(const std::string &input)
+    {
+        std::regex point_regex("\\[\\s*([-0-9\\.eE]+)\\s*,\\s*([-0-9\\.eE]+)\\s*,\\s*([-0-9\\.eE]+)\\s*\\]");
+        std::smatch match;
+        std::string s = input;
+
+        while (std::regex_search(s, match, point_regex))
+        {
+            if (match.size() == 4)
+            {
+                geometry_msgs::PoseStamped wp;
+                wp.header.frame_id = "map";
+                wp.pose.position.x = std::stod(match[1]);
+                wp.pose.position.y = std::stod(match[2]);
+                wp.pose.position.z = std::stod(match[3]);
+                wp.pose.orientation.w = 1.0;
+                waypoints_.push_back(wp);
+            }
+            s = match.suffix();
+        }
     }
 
     void odomCallback(const nav_msgs::Odometry::ConstPtr &msg)
@@ -172,6 +178,7 @@ private:
     geometry_msgs::PoseStamped current_pose_;
     std::string pose_topic_;
     std::string odom_topic_;
+    std::string goal_topic_;
 
     double distance_threshold_;
     double wait_time_;
