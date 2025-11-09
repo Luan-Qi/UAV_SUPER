@@ -28,7 +28,7 @@ public:
     bool is_armed;
     bool is_command_mode;
     bool enter_command_mode;
-    bool is_hover_mode;
+    bool is_offboard_mode;
     bool enter_hover_mode;
     bool is_hold_mode;
 

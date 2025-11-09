@@ -1,0 +1,19 @@
+<launch>
+    <arg name="position_max_x" value="50.0" />
+    <arg name="position_min_x" value="-2.0" />
+    <arg name="position_max_y" value="2.0" />
+    <arg name="position_min_y" value="-3.0" />
+    <arg name="position_max_z" value="1.5" />
+    <arg name="position_min_z" value="0.0" />
+    <arg name="position_max_vel" value="2.0" />
+
+    <node pkg="uav_px4_ctrl" type="px4ctrl_node" name="px4ctrl_node" output="screen" >
+        <param name="position_max_x" value="$(arg position_max_x)" />
+        <param name="position_min_x" value="$(arg position_min_x)" />
+        <param name="position_max_y" value="$(arg position_max_y)" />
+        <param name="position_min_y" value="$(arg position_min_y)" />
+        <param name="position_max_z" value="$(arg position_max_z)" />
+        <param name="position_min_z" value="$(arg position_min_z)" />
+        <param name="position_max_vel" value="$(arg position_max_vel)" />
+    </node>
+</launch>

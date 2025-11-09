@@ -10,7 +10,7 @@ RC_Data_t::RC_Data_t()
 
     // Parameter initilation is very important in RC-Free usage!
     is_armed = false;
-    is_hover_mode = true;
+    is_offboard_mode = true;
     enter_hover_mode = false;
     is_command_mode = true;
     enter_command_mode = false;
@@ -73,12 +73,12 @@ void RC_Data_t::feed(mavros_msgs::RCInConstPtr pMsg)
         ROS_INFO("[PX4CTRL] Exit offboard mode.");}
 
     if (mode > API_MODE_THRESHOLD_VALUE)
-        is_hover_mode = true;
+        is_offboard_mode = true;
     else
-        is_hover_mode = false;
+        is_offboard_mode = false;
 
     // 2
-    if (is_hover_mode)
+    if (is_offboard_mode)
     {
         if (last_gear < GEAR_SHIFT_UP_THRESHOLD && gear > GEAR_SHIFT_UP_THRESHOLD){
             enter_command_mode = true;

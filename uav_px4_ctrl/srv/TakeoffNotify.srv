@@ -1,0 +1,6 @@
+# 请求部分（无人机起飞后发送）
+bool takeoff_done
+
+---
+# 响应部分（服务端回应）
+string response

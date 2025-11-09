@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   quadrotor_msgs
   tf2
   tf2_geometry_msgs
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -78,6 +79,16 @@ find_package(catkin REQUIRED COMPONENTS
 #   geometry_msgs#   nav_msgs#   std_msgs
 # )
 
+add_service_files(
+  FILES
+  TakeoffNotify.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
 ################################################
@@ -108,6 +119,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
+  CATKIN_DEPENDS roscpp std_msgs message_runtime
 #  INCLUDE_DIRS include
 #  LIBRARIES uav_px4_ctrl
 #  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp std_msgs
@@ -167,6 +179,10 @@ add_dependencies(pub_goal ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_
 add_executable(waypoint_publisher src/pub_waypoint.cpp)
 target_link_libraries(waypoint_publisher ${catkin_LIBRARIES})
 add_dependencies(waypoint_publisher ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(mission_manger src/mission_manger.cpp)
+target_link_libraries(mission_manger ${catkin_LIBRARIES})
+add_dependencies(mission_manger ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 
 
