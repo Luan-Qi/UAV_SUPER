@@ -5,7 +5,37 @@
 #include <string>
 #include <cmath>
 #include <regex>
+#include <Eigen/Dense>
 #include "uav_px4_ctrl/TakeoffNotify.h"
+
+
+Eigen::Matrix4d poseToMatrix(const geometry_msgs::Pose &pose)
+{
+    Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
+    Eigen::Quaterniond q(pose.orientation.w, pose.orientation.x,
+                         pose.orientation.y, pose.orientation.z);
+    Eigen::Matrix3d R = q.toRotationMatrix();
+    T.block<3, 3>(0, 0) = R;
+    T(0, 3) = pose.position.x;
+    T(1, 3) = pose.position.y;
+    T(2, 3) = pose.position.z;
+    return T;
+}
+
+geometry_msgs::Pose matrixToPose(const Eigen::Matrix4d &T)
+{
+    geometry_msgs::Pose pose;
+    Eigen::Matrix3d R = T.block<3, 3>(0, 0);
+    Eigen::Quaterniond q(R);
+    pose.position.x = T(0, 3);
+    pose.position.y = T(1, 3);
+    pose.position.z = T(2, 3);
+    pose.orientation.x = q.x();
+    pose.orientation.y = q.y();
+    pose.orientation.z = q.z();
+    pose.orientation.w = q.w();
+    return pose;
+}
 
 class WaypointPublisher
 {
@@ -19,6 +49,7 @@ public:
         nh.param("wait_time", wait_time_, 0.0);
         nh.param("start_delay", start_delay_, 3.0);
         nh.param("topic_timeout", topic_timeout_, 3.0);
+        nh.param("mission_cycle", mission_cycle_, false);
 
         std::string waypoint_str;
         nh.param("waypoints", waypoint_str, std::string("[[0,0,1.0],[2,0,1.0]]"));
@@ -26,11 +57,11 @@ public:
 
         if (waypoints_.empty())
         {
-            ROS_ERROR("No waypoints loaded!");
+            ROS_ERROR("[mission] No waypoints loaded!");
             ros::shutdown();
         }
 
-        ROS_INFO("Loaded %zu waypoints:", waypoints_.size());
+        ROS_INFO("[mission] Loaded %zu waypoints:", waypoints_.size());
         for (size_t i = 0; i < waypoints_.size(); ++i)
         {
             ROS_INFO("  [%zu] x=%.2f, y=%.2f, z=%.2f",
@@ -53,6 +84,7 @@ public:
             use_odom_ = false;
         }
 
+        trans_sub_ = nh.subscribe("/map_to_odom", 2, &WaypointPublisher::map2odomCallback, this);
         srv_takeoff_ = nh.advertiseService("/takeoff_notify", &WaypointPublisher::takeoffCallback, this);
         timeout_timer_ = nh.createTimer(ros::Duration(5.0), &WaypointPublisher::timeoutCheckCallback, this);
 
@@ -110,7 +142,7 @@ public:
 
         if (!reached_ && dist < distance_threshold_)
         {
-            ROS_INFO("Reached waypoint %d (%.2f, %.2f, %.2f)",
+            ROS_INFO("[mission] Reached waypoint %d (%.2f, %.2f, %.2f)",
                      current_wp_idx_ + 1,
                      target.pose.position.x,
                      target.pose.position.y,
@@ -121,7 +153,20 @@ public:
 
         if (reached_ && (ros::Time::now() - reach_time_).toSec() >= wait_time_)
         {
-            current_wp_idx_ = (current_wp_idx_ + 1) % waypoints_.size();
+            current_wp_idx_ += 1;
+            if(mission_cycle_)
+            {
+                current_wp_idx_ %= waypoints_.size();
+            }
+            else
+            {
+                if(current_wp_idx_ >= waypoints_.size())
+                {
+                    ROS_INFO("[mission] All missions have been completed !");
+                    shutdown_requested_ = true;
+                    return;
+                }
+            }
             publishGoal();
             reached_ = false;
         }
@@ -133,11 +178,37 @@ public:
         {
             waypoints_[current_wp_idx_].header.stamp = ros::Time::now();
             goal_pub_.publish(waypoints_[current_wp_idx_]);
-            ROS_INFO("Published goal %d: (%.2f, %.2f, %.2f)",
+            ROS_INFO("[mission] Published goal %d: (%.2f, %.2f, %.2f)",
                      current_wp_idx_ + 1,
                      waypoints_[current_wp_idx_].pose.position.x,
                      waypoints_[current_wp_idx_].pose.position.y,
                      waypoints_[current_wp_idx_].pose.position.z);
+        }
+    }
+
+    void map2odomCallback(const nav_msgs::Odometry::ConstPtr &msg)
+    {
+        if(have_map_to_odom_ || takeoff_done_) return;
+
+        cur_map_to_odom = *msg;
+        have_map_to_odom_ = true;
+
+        ROS_INFO("[mission] Got map_to_odom transform!");
+        ROS_INFO("[mission] transformed %zu waypoints:", waypoints_.size());
+
+        Eigen::Matrix4d T_map_to_odom = poseToMatrix(cur_map_to_odom.pose.pose);
+        Eigen::Matrix4d T_odom_to_map = T_map_to_odom.inverse();
+        for (size_t i = 0; i < waypoints_.size(); ++i)
+        {
+            Eigen::Matrix4d wp_global = poseToMatrix(waypoints_[i].pose);
+            Eigen::Matrix4d wp_local = T_odom_to_map * wp_global;
+            waypoints_[i].pose = matrixToPose(wp_local);
+
+            ROS_INFO("  [%zu] x=%.2f, y=%.2f, z=%.2f",
+                     i + 1,
+                     waypoints_[i].pose.position.x,
+                     waypoints_[i].pose.position.y,
+                     waypoints_[i].pose.position.z);
         }
     }
 
@@ -146,7 +217,7 @@ public:
     {
         if (req.takeoff_done)
         {
-            ROS_INFO("UAV has taken off!");
+            ROS_INFO("[mission] UAV has taken off!");
             res.response = "Hello, world!";
             takeoff_done_ = true;
         }
@@ -157,21 +228,21 @@ public:
     {
         if (last_pose_time_.isZero())
         {
-            ROS_WARN_THROTTLE(10, "No position message received yet...");
+            ROS_WARN_THROTTLE(10, "[mission] No position message received yet...");
             return;
         }
 
         double dt = (ros::Time::now() - last_pose_time_).toSec();
         if (dt > topic_timeout_)
         {
-            ROS_WARN("No position update! Check your topics.");
+            ROS_WARN("[mission] No position update! Check your topics.");
         }
     }
 
     void spin()
     {
         ros::Rate rate(10);
-        ROS_INFO("Waiting for takeoff notification...");
+        ROS_INFO("[mission] Waiting for takeoff notification...");
         while (ros::ok())
         {
             if (takeoff_done_) break;
@@ -179,12 +250,17 @@ public:
             rate.sleep();
         }
 
-        ROS_INFO("Waiting %.1f seconds before starting...", start_delay_);
+        ROS_INFO("[mission] Waiting %.1f seconds before starting...", start_delay_);
         ros::Duration(start_delay_).sleep();
         publishGoal();
 
         while (ros::ok())
         {
+            if (shutdown_requested_)
+            {
+                timeout_timer_.stop();
+                return;
+            }
             ros::spinOnce();
             rate.sleep();
         }
@@ -194,7 +270,10 @@ private:
     ros::Publisher goal_pub_;
     ros::Subscriber pose_sub_;
     ros::Subscriber odom_sub_;
+    ros::Subscriber trans_sub_;
     ros::ServiceServer srv_takeoff_;
+    ros::ServiceClient srv_accomplish_;
+    ros::ServiceClient srv_abort_;
     ros::Timer timeout_timer_;
 
     std::vector<geometry_msgs::PoseStamped> waypoints_;
@@ -202,6 +281,7 @@ private:
     std::string pose_topic_;
     std::string odom_topic_;
     std::string goal_topic_;
+    bool mission_cycle_;
 
     double distance_threshold_;
     double wait_time_;
@@ -211,18 +291,22 @@ private:
     int current_wp_idx_;
     bool reached_;
     bool use_odom_;
+    bool have_map_to_odom_;
     bool takeoff_done_;
+    bool shutdown_requested_;
 
+    nav_msgs::Odometry cur_map_to_odom;
     ros::Time reach_time_;
     ros::Time last_pose_time_;
 };
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "waypoint_publisher");
+    ros::init(argc, argv, "mission_manger");
     ros::NodeHandle nh("~");
 
     WaypointPublisher wp_pub(nh);
     wp_pub.spin();
+    ros::shutdown();
     return 0;
 }

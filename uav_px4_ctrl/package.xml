@@ -58,6 +58,7 @@
     <depend>tf2</depend>
     <depend>tf2_geometry_msgs</depend>
     <depend>message_generation</depend>
+    <depend>message_runtime</depend>
 
     <!-- The export tag contains other, unspecified, tags -->
     <export>

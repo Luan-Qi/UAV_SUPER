@@ -62,15 +62,15 @@ public:
     Command_Data_t cmd_data;
     Odom_Data_t odom_data;
 
-    DroneCtrl() {
+    DroneCtrl() : nh("~"){
         nh.param<double>("/takeoff_height", takeoff_height, takeoff_height);
-        nh.param<double>("position_max_x", position_max_x,  1.0);
-        nh.param<double>("position_min_x", position_min_x, -1.0);
-        nh.param<double>("position_max_y", position_max_x,  1.0);
-        nh.param<double>("position_min_y", position_min_x, -1.0);
-        nh.param<double>("position_max_z", position_max_x,  1.0);
-        nh.param<double>("position_min_z", position_min_x,  0.0);
-        nh.param<double>("position_max_vel", position_max_vel,  0.0);
+        nh.param<double>("position_max_x", position_max_x, position_max_x);
+        nh.param<double>("position_min_x", position_min_x, position_min_x);
+        nh.param<double>("position_max_y", position_max_y, position_max_y);
+        nh.param<double>("position_min_y", position_min_y, position_min_y);
+        nh.param<double>("position_max_z", position_max_z, position_max_z);
+        nh.param<double>("position_min_z", position_min_z, position_min_z);
+        nh.param<double>("position_max_vel", position_max_vel, position_max_vel);
 
         state_sub = nh.subscribe<mavros_msgs::State>(
             "/mavros/state", 10, boost::bind(&State_Data_t::feed, &state_data, _1));
@@ -85,7 +85,7 @@ public:
         odom_sub = nh.subscribe("/Odometry", 10, &DroneCtrl::odometryCallback, this);
 
         pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/mavros/vision_pose/pose", 10);
-        local_pos_pub = nh.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
+        local_pos_pub = nh.advertise<geometry_msgs::PoseStamped>("/mavros/setpoint_position/local", 10);
         traj_start_trigger_pub = nh.advertise<geometry_msgs::PoseStamped>("/traj_start_trigger", 10);
 
         set_FCU_mode_srv = nh.serviceClient<mavros_msgs::SetMode>("/mavros/set_mode");
@@ -141,7 +141,7 @@ void DroneCtrl::odometryCallback(const nav_msgs::Odometry::ConstPtr& msg)
 
     uav_mavros_pose_fix(&pose_msg); // 矫正坐标系
 
-    //pose_pub.publish(pose_msg);
+    pose_pub.publish(pose_msg);
 }
 
 void DroneCtrl::init_target_takeoff()
@@ -187,9 +187,9 @@ void DroneCtrl::process()
     geometry_msgs::PoseStamped target;
     static bool have_hold_set = false;
 
-    if(rc_data.is_armed && !is_armed)
+    if(rc_data.is_armed && rc_data.is_offboard_mode &&!is_armed)
     {
-        if((ros::Time::now() - last_arm_request).toSec() <= 3.0)
+        if((ros::Time::now() - last_arm_request).toSec() > 3.0)
         {
             mavros_msgs::CommandBool arm_cmd;
             arm_cmd.request.value = true;
@@ -201,7 +201,7 @@ void DroneCtrl::process()
             }
             else
             {
-                ROS_ERROR("Vehicle while failed armimg, please check your system and restart!");
+                ROS_ERROR("[PX4CTRL] Vehicle while failed armimg, please check your system and restart!");
             }
             last_arm_request = ros::Time::now();
         }
@@ -231,12 +231,12 @@ void DroneCtrl::process()
                 is_land = false;
             }
 
-            if(odom_data.msg.pose.pose.position.z > takeoff_height - 0.05 && !is_takeoff) 
+            if(odom_data.msg.pose.pose.position.z > takeoff_height - 0.5 && !is_takeoff) 
             {
                 uav_px4_ctrl::TakeoffNotify srv;
                 srv.request.takeoff_done = true;
 
-                if(!client.call(srv))
+                if(!takeoff_client_src.call(srv))
                     enter_hold = true;
                 is_takeoff = true;
             }
@@ -251,8 +251,9 @@ void DroneCtrl::process()
             }
             else
             {
+                if(!is_landing) is_land = true;
+                if(!is_land && !is_takeoff) is_landing = true;
                 is_takeoff = false;
-                if(!is_land) is_landing = true;
                 enter_hold = false;
             }
             have_hold_set = false;
@@ -285,7 +286,7 @@ void DroneCtrl::publish_target()
     target.pose.position.y = clamp(target.pose.position.y, position_min_x, position_max_x);
     target.pose.position.z = clamp(target.pose.position.z, position_min_z, position_max_z);
 
-    if(is_takeoff)
+    if(false)
     {
         ros::Time now = ros::Time::now();
         double dt = (now - odom_data.rcv_stamp).toSec();
@@ -305,14 +306,14 @@ void DroneCtrl::publish_target()
 
             if (vel > position_max_vel)
             {
-                ROS_WARN("[DroneCtrl] Velocity limit exceeded: %.2f m/s > %.2f m/s", vel, position_max_vel);
+                ROS_WARN("[PX4CTRL] Velocity limit exceeded: %.2f m/s > %.2f m/s", vel, position_max_vel);
                 enter_hold = true;
                 return;
             }
         }
         else
         {
-            ROS_WARN("[DroneCtrl] Invalid time interval dt=%.6f", dt);
+            ROS_WARN("[PX4CTRL] Invalid time interval dt=%.6f", dt);
             return;
         }
     }

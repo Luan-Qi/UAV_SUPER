@@ -37,3 +37,7 @@ add_dependencies(publish_initial_pose ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catk
 add_executable(transform_fusion src/transform_fusion.cpp)
 target_link_libraries(transform_fusion ${catkin_LIBRARIES})
 add_dependencies(transform_fusion ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(odom_republisher src/odom_republisher.cpp)
+target_link_libraries(odom_republisher ${catkin_LIBRARIES})
+add_dependencies(odom_republisher ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
