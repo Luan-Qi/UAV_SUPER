@@ -152,6 +152,9 @@ int main(int argc, char **argv)
         ros::spinOnce();
         if (have_start && have_goal && have_octomap)
         {
+            ROS_INFO("[astar] start pose [%.1f,%.1f,%.1f], goal pose [%.1f,%.1f,%.1f]", 
+                 start_pose.pose.position.x, start_pose.pose.position.y, start_pose.pose.position.z, 
+                 goal_pose.pose.position.x, goal_pose.pose.position.y, goal_pose.pose.position.z);
             ROS_INFO("[astar] Start planning...");
             Eigen::Vector3d start(start_pose.pose.position.x,
                                   start_pose.pose.position.y,
