@@ -27,7 +27,7 @@ void cbPath(const nav_msgs::Path::ConstPtr& msg)
     has_path = true;
     has_finished = false;
     current_index = 0;
-    ROS_INFO("[path_follower] Received new path with %lu points.", msg->poses.size());
+    ROS_INFO("[path_follower_3d] Received new path with %lu points.", msg->poses.size());
 }
 
 void cbOdom(const nav_msgs::Odometry::ConstPtr& msg)
@@ -55,13 +55,13 @@ int main(int argc, char** argv)
     nh.param("path_step", path_step, 5);
     nh.param("publish_rate", publish_rate, 5.0);
 
-    ros::Subscriber sub_path = nh.subscribe("/local_path", 1, cbPath);
-    ros::Subscriber sub_odom = nh.subscribe("/Odometry", 1, cbOdom);
+    ros::Subscriber sub_path = nh.subscribe("/global_path", 1, cbPath);
+    ros::Subscriber sub_odom = nh.subscribe("/localization", 1, cbOdom);
     ros::Publisher pub_goal = nh.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 1);
 
     ros::Rate rate(publish_rate);
 
-    ROS_INFO("[path_follower] Node started. Waiting for /local_path and /odom...");
+    ROS_INFO("[path_follower_3d] Node started. Waiting for /local_path and /odom...");
 
     while (ros::ok())
     {
@@ -93,7 +93,7 @@ int main(int argc, char** argv)
             }
             else
             {
-                ROS_INFO("[path_follower] Path finished.");
+                ROS_INFO("[path_follower_3d] Path finished.");
                 has_path = false;
                 current_index = 0;
             }

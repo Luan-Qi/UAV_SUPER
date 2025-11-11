@@ -84,7 +84,7 @@ public:
             use_odom_ = false;
         }
 
-        trans_sub_ = nh.subscribe("/map_to_odom", 2, &WaypointPublisher::map2odomCallback, this);
+        //trans_sub_ = nh.subscribe("/map_to_odom", 2, &WaypointPublisher::map2odomCallback, this);
         srv_takeoff_ = nh.advertiseService("/takeoff_notify", &WaypointPublisher::takeoffCallback, this);
         timeout_timer_ = nh.createTimer(ros::Duration(5.0), &WaypointPublisher::timeoutCheckCallback, this);
 
@@ -139,6 +139,7 @@ public:
         double dy = target.pose.position.y - current_pose_.pose.position.y;
         double dz = target.pose.position.z - current_pose_.pose.position.z;
         double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+        //ROS_INFO("distance:%f", dist);
 
         if (!reached_ && dist < distance_threshold_)
         {
@@ -202,13 +203,19 @@ public:
         {
             Eigen::Matrix4d wp_global = poseToMatrix(waypoints_[i].pose);
             Eigen::Matrix4d wp_local = T_odom_to_map * wp_global;
-            waypoints_[i].pose = matrixToPose(wp_local);
+
+            geometry_msgs::Pose local_pose = matrixToPose(wp_local);
+            geometry_msgs::PoseStamped local_wp;
+            local_wp.header.frame_id = "map";
+            local_wp.pose = local_pose;
+            local_wp.pose.orientation.w = 1.0;
+            local_waypoints_.push_back(local_wp);
 
             ROS_INFO("  [%zu] x=%.2f, y=%.2f, z=%.2f",
                      i + 1,
-                     waypoints_[i].pose.position.x,
-                     waypoints_[i].pose.position.y,
-                     waypoints_[i].pose.position.z);
+                     local_waypoints_[i].pose.position.x,
+                     local_waypoints_[i].pose.position.y,
+                     local_waypoints_[i].pose.position.z);
         }
     }
 
@@ -277,23 +284,24 @@ private:
     ros::Timer timeout_timer_;
 
     std::vector<geometry_msgs::PoseStamped> waypoints_;
+    std::vector<geometry_msgs::PoseStamped> local_waypoints_;
     geometry_msgs::PoseStamped current_pose_;
     std::string pose_topic_;
     std::string odom_topic_;
     std::string goal_topic_;
-    bool mission_cycle_;
+    bool mission_cycle_ = false;
 
     double distance_threshold_;
     double wait_time_;
     double start_delay_;
     double topic_timeout_;
 
-    int current_wp_idx_;
-    bool reached_;
-    bool use_odom_;
-    bool have_map_to_odom_;
-    bool takeoff_done_;
-    bool shutdown_requested_;
+    int current_wp_idx_ = 0;
+    bool reached_ = false;
+    bool use_odom_ = false;
+    bool have_map_to_odom_ = false;
+    bool takeoff_done_ = false;
+    bool shutdown_requested_ = false;
 
     nav_msgs::Odometry cur_map_to_odom;
     ros::Time reach_time_;

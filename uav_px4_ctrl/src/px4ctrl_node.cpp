@@ -82,7 +82,7 @@ public:
         rc_sub = nh.subscribe<mavros_msgs::RCIn>(
             "/mavros/rc/in", 10, boost::bind(&RC_Data_t::feed, &rc_data, _1));
 
-        odom_sub = nh.subscribe("/Odometry", 10, &DroneCtrl::odometryCallback, this);
+        odom_sub = nh.subscribe("/localization", 10, &DroneCtrl::odometryCallback, this);
 
         pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/mavros/vision_pose/pose", 10);
         local_pos_pub = nh.advertise<geometry_msgs::PoseStamped>("/mavros/setpoint_position/local", 10);

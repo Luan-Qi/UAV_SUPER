@@ -2,11 +2,12 @@
     <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor2-1-good_downsampled.pcd"/>
     <arg name="rviz" default="true" />
 
+
     <!-- global locatization main -->
-    <arg name="map_voxel_size" default="0.2" />
+    <arg name="map_voxel_size" default="0.1" />
     <arg name="scan_voxel_size" default="0.1" />
     <arg name="freq_localization" default="0.5" />
-    <arg name="localization_th" default="0.90" />
+    <arg name="localization_th" default="0.95" />
     <arg name="fov" default="6.28" />
     <arg name="fov_far" default="10.0" />
     <arg name="map_in_topic" default="/map" />
@@ -21,6 +22,7 @@
         <param name="map_in_topic" value="$(arg map_in_topic)" />
     </node>
 
+
     <!-- provide a estimate pose for global locatization -->
     <arg name="init_x" default="0.0" />
     <arg name="init_y" default="0.0" />
@@ -32,6 +34,7 @@
     <node pkg="uav_locatiation" type="publish_initial_pose" name="publish_initial_pose" output="screen" 
         args="$(arg init_x) $(arg init_y) $(arg init_z) $(arg init_roll) $(arg init_pitch) $(arg init_yaw) " />
 
+
     <!-- global locatization utils for global init pose and pubing global location -->
     <arg name="global_start_topic" default="/start_pose" />
     <arg name="global_locatiation_hz" default="30.0" />
@@ -42,21 +45,38 @@
         <param name="global_locatiation_hz" value="$(arg global_locatiation_hz)" />
     </node>
 
+
     <!-- local Odometry -->
     <include file="$(find fast_lio)/launch/mapping_mid360.launch" >
         <arg name="rviz" value="false" />
     </include>
 
+
     <!-- local Odometry display in rviz -->
-    <node pkg="uav_locatiation" type="odom_republisher" name="odom_republisher" output="screen">
+    <node pkg="uav_locatiation" type="odom_republisher" name="odom_republisher" output="screen" />
+
 
     <!-- global map -->
     <include file="$(find uav_planner)/launch/octomap_publisher.launch" >
         <arg name="pcd_file" value="$(arg pcd_file)"/>
     </include>
 
+
     <!-- local planner main -->
-    <include file="$(find uav_planner)/launch/astar_planner.launch" />
+    <arg name="octomap_topic" default="/octomap_full" />
+    <arg name="start_pose_topic" default="/start_pose" />
+    <arg name="goal_pose_topic" default="/goal_pose" />
+    <arg name="enable_obstacle_show" default="true" />
+    <arg name="inflater_size" default="3" />
+
+    <include file="$(find uav_planner)/launch/astar_planner.launch" >
+        <arg name="octomap_topic" value="$(arg octomap_topic)" />
+        <arg name="start_pose_topic" value="$(arg start_pose_topic)" />
+        <arg name="goal_pose_topic" value="$(arg goal_pose_topic)" />
+        <arg name="enable_obstacle_show" value="$(arg enable_obstacle_show)" />
+        <arg name="inflater_size" value="$(arg inflater_size)" />
+    </include>
+
 
     <!-- trace local odom to local path -->
     <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
@@ -65,11 +85,14 @@
         <param name="publish_rate" value="5.0"/>
     </node>
 
+
     <!-- local planner main -->
     <include file="$(find ego_planner)/launch/single_run_in_exp.launch" />
 
+
     <!-- mission manager main -->
     <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" />
+    
 
     <group if="$(arg rviz)">
 	    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz_planner" 

@@ -1,7 +1,7 @@
 <launch>
     <node pkg="uav_px4_ctrl" type="mission_manger" name="mission_manger" output="screen" >
         <!-- 输入话题（odom 优先） -->
-        <param name="odom_topic" value="/Odometry" />
+        <param name="odom_topic" value="/localization" />
         <param name="pose_topic" value="/mavros/local_position/pose" />
         <param name="goal_topic" value="/goal_pose" />
 
@@ -21,6 +21,6 @@
         <param name="mission_cycle" value="false" />
 
         <!-- 路径点 -->
-        <param name="waypoints" value="[[35.0, 0.0, 0.8], [52.5, -8.0, 0.8], [0.0, 0.0, 0.8]]"/>
+        <param name="waypoints" value="[[35.0, 0.0, 0.8], [52.0, -0.0, 0.8], [0.0, 0.0, 0.8]]"/>
     </node>
 </launch>

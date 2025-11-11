@@ -148,9 +148,9 @@ int main(int argc, char **argv)
     nh.param<double>("global_locatiation_hz", FREQ_PUB_LOCALIZATION, FREQ_PUB_LOCALIZATION);
     nh.param<double>("/takeoff_height", TAKEOFF_HEIGHT, TAKEOFF_HEIGHT);
 
-    ros::Subscriber sub_odom = nh.subscribe("/Odometry", 2, cbOdom);
+    ros::Subscriber sub_odom = nh.subscribe("/Odometry", 10, cbOdom);
     ros::Subscriber sub_map_to_odom = nh.subscribe("/map_to_odom", 2, cbMapToOdom);
-    pub_localization = nh.advertise<nav_msgs::Odometry>("/localization", 2);
+    pub_localization = nh.advertise<nav_msgs::Odometry>("/localization", 10);
     pub_global_start_pose = nh.advertise<geometry_msgs::PoseStamped>(global_start_topic, 2);
 
     // 开启独立线程进行融合发布

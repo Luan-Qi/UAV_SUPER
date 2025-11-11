@@ -16,6 +16,4 @@
         <param name="position_min_z" value="$(arg position_min_z)" />
         <param name="position_max_vel" value="$(arg position_max_vel)" />
     </node>
-    
-    <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" />
 </launch>
