@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(uav_locatiation)
+project(uav_location)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -21,7 +21,7 @@ catkin_package(
 )
 
 include_directories(
-  include/uav_locatiation
+  include/uav_location
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
 )

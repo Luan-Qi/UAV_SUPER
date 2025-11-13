@@ -73,7 +73,7 @@
     <!-- trace local odom to local path -->
     <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
         <param name="goal_distance_threshold" value="0.4"/>
-        <param name="path_step" value="3"/>
+        <param name="path_step" value="2"/>
         <param name="publish_rate" value="5.0"/>
     </node>
 

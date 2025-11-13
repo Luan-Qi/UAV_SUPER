@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>uav_locatiation</name>
+  <name>uav_location</name>
   <version>0.0.0</version>
-  <description>The uav_locatiation package</description>
+  <description>The uav_location package</description>
   <maintainer email="orangepi@todo.todo">orangepi</maintainer>
   <license>TODO</license>
 

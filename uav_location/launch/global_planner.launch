@@ -24,7 +24,7 @@
 
 
     <!-- provide a estimate pose for global locatization -->
-    <arg name="init_x" default="0.0" />
+    <arg name="init_x" default="52.0" />
     <arg name="init_y" default="0.0" />
     <arg name="init_z" default="0.0" />
     <arg name="init_roll" default="0.0" />
@@ -67,7 +67,7 @@
     <arg name="start_pose_topic" default="/start_pose" />
     <arg name="goal_pose_topic" default="/goal_pose" />
     <arg name="enable_obstacle_show" default="true" />
-    <arg name="inflater_size" default="3" />
+    <arg name="inflater_size" default="2" />
 
     <include file="$(find uav_planner)/launch/astar_planner.launch" >
         <arg name="octomap_topic" value="$(arg octomap_topic)" />
@@ -80,8 +80,8 @@
 
     <!-- trace local odom to local path -->
     <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
-        <param name="goal_distance_threshold" value="0.4"/>
-        <param name="path_step" value="3"/>
+        <param name="goal_distance_threshold" value="0.3"/>
+        <param name="path_step" value="2"/>
         <param name="publish_rate" value="5.0"/>
     </node>
 

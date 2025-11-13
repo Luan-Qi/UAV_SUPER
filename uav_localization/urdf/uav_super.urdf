@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<robot name="uav_livox_tf" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- ======================= base_link ======================= -->
+    <link name="base_link"/>
+
+    <!-- ======================= IMU Link ========================= -->
+    <link name="livox_frame"/>
+    <joint name="base_to_imu" type="fixed">
+        <parent link="base_link"/>
+        <child link="livox_frame"/>
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ======================= Lidar Link ======================= -->
+    <link name="lidar_link"/>
+    <joint name="base_to_lidar" type="fixed">
+        <parent link="base_link"/>
+        <child link="lidar_link"/>
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ======================= Camera Link (可选) =============== -->
+    <!--
+    <link name="camera_link"/>
+    <joint name="base_to_camera" type="fixed">
+        <parent link="base_link"/>
+        <child link="camera_link"/>
+        <origin xyz="0.1 0.0 0.0" rpy="0 0 0"/>
+    </joint>
+    -->
+
+</robot>
