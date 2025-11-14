@@ -16,6 +16,8 @@ int current_index = 0;
 double goal_distance_threshold = 0.5; // 到达目标的判定距离
 int path_step = 5; // 每隔几个点发送一次目标
 double publish_rate = 5.0; // Hz
+std::string path_topic, odom_topic, goal_topic;
+
 
 void cbPath(const nav_msgs::Path::ConstPtr& msg)
 {
@@ -54,14 +56,17 @@ int main(int argc, char** argv)
     nh.param("goal_distance_threshold", goal_distance_threshold, 0.5);
     nh.param("path_step", path_step, 5);
     nh.param("publish_rate", publish_rate, 5.0);
+    nh.param<std::string>("path_topic", path_topic, "/global_path");
+    nh.param<std::string>("odom_topic", odom_topic, "/localization");
+    nh.param<std::string>("goal_topic", goal_topic, "/move_base_simple/goal");
 
-    ros::Subscriber sub_path = nh.subscribe("/global_path", 1, cbPath);
-    ros::Subscriber sub_odom = nh.subscribe("/localization", 1, cbOdom);
-    ros::Publisher pub_goal = nh.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 1);
+    ros::Subscriber sub_path = nh.subscribe(path_topic, 1, cbPath);
+    ros::Subscriber sub_odom = nh.subscribe(odom_topic, 1, cbOdom);
+    ros::Publisher pub_goal = nh.advertise<geometry_msgs::PoseStamped>(goal_topic, 1);
 
     ros::Rate rate(publish_rate);
 
-    ROS_INFO("[path_follower_3d] Node started. Waiting for /local_path and /odom...");
+    ROS_INFO("[path_follower_3d] Node started. Waiting for /path and /odom...");
 
     while (ros::ok())
     {

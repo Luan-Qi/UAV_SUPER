@@ -7,6 +7,7 @@
 #include <nav_msgs/Odometry.h>
 #include <mavros_msgs/RCIn.h>
 #include <mavros_msgs/State.h>
+#include <mavros_msgs/BatteryStatus.h>
 #include <mavros_msgs/ExtendedState.h>
 
 class RC_Data_t
@@ -73,6 +74,18 @@ public:
 
     State_Data_t();
     void feed(mavros_msgs::StateConstPtr pMsg);
+    bool is_received(const ros::Time &now_time);
+};
+
+class Battery_Data_t
+{
+public:
+    mavros_msgs::BatteryStatus battery;
+    ros::Time rcv_stamp;
+
+    Battery_Data_t();
+    void feed(mavros_msgs::BatteryStatusConstPtr pMsg);
+    bool is_received(const ros::Time &now_time);
 };
 
 class Command_Data_t

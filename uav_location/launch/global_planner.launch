@@ -24,7 +24,7 @@
 
 
     <!-- provide a estimate pose for global locatization -->
-    <arg name="init_x" default="52.0" />
+    <arg name="init_x" default="0.0" />
     <arg name="init_y" default="0.0" />
     <arg name="init_z" default="0.0" />
     <arg name="init_roll" default="0.0" />
@@ -62,7 +62,7 @@
     </include>
 
 
-    <!-- local planner main -->
+    <!-- global planner main -->
     <arg name="octomap_topic" default="/octomap_full" />
     <arg name="start_pose_topic" default="/start_pose" />
     <arg name="goal_pose_topic" default="/goal_pose" />

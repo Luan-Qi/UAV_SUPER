@@ -130,6 +130,7 @@ bool RC_Data_t::is_received(const ros::Time &now_time)
 	return (now_time - this->rcv_stamp).toSec() < 0.5;
 }
 
+
 State_Data_t::State_Data_t()
 {
     rcv_stamp = ros::Time(0);
@@ -138,7 +139,31 @@ State_Data_t::State_Data_t()
 void State_Data_t::feed(mavros_msgs::StateConstPtr pMsg)
 {
     current_state = *pMsg;
+    rcv_stamp = ros::Time::now();
 }
+
+bool State_Data_t::is_received(const ros::Time &now_time)
+{
+	return (now_time - this->rcv_stamp).toSec() < 0.5;
+}
+
+
+Battery_Data_t::Battery_Data_t()
+{
+    rcv_stamp = ros::Time(0);
+}
+
+void Battery_Data_t::feed(mavros_msgs::BatteryStatusConstPtr pMsg)
+{
+    battery = *pMsg;
+    rcv_stamp = ros::Time::now();
+}
+
+bool Battery_Data_t::is_received(const ros::Time &now_time)
+{
+    return (now_time - this->rcv_stamp).toSec() < 0.5;
+}
+
 
 Command_Data_t::Command_Data_t()
 {
