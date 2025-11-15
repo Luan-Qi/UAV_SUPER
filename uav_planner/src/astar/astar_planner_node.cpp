@@ -6,6 +6,7 @@
 #include <octomap/OcTree.h>
 #include <octomap_msgs/conversions.h>
 #include "astar_show_obs.h"
+#include "uav_px4_ctrl/TakeoffNotify.h"
 
 
 AstarPathFinder astar;
@@ -138,6 +139,8 @@ int main(int argc, char **argv)
     ros::Subscriber start_sub = nh.subscribe(start_pose_topic, 10, startCallback);
     ros::Subscriber goal_sub = nh.subscribe(goal_pose_topic, 10, goalCallback);
 
+    ros::ServiceClient planner_failed_client = nh.serviceClient<uav_px4_ctrl::TakeoffNotify>("/planner_fail_notify");
+
     path_pub = nh.advertise<nav_msgs::Path>(planned_path_topic, 10, true);
 
     if (publish_obstacle_show)
@@ -169,6 +172,12 @@ int main(int argc, char **argv)
             if (path_pts.empty())
             {
                 ROS_ERROR("[astar] A* failed to find a path!");
+                have_start = false;
+
+                uav_px4_ctrl::TakeoffNotify srv;
+                srv.request.takeoff_done = true;
+                if(!planner_failed_client.call(srv))
+                    have_octomap = false;
             }
             else
             {

@@ -18,6 +18,7 @@ def callback(msg):
 
     cloud_msg = pc2.create_cloud(msg.header, fields, points)
     cloud_msg.header.frame_id = "lidar_link"
+    cloud_msg.header.stamp = msg.header.stamp
     pub.publish(cloud_msg)
 
 if __name__ == "__main__":

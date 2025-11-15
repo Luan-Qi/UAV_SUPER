@@ -44,6 +44,7 @@ public:
     {
         nh.param("pose_topic", pose_topic_, std::string("/mavros/local_position/pose"));
         nh.param("odom_topic", odom_topic_, std::string(""));
+        nh.param("start_topic", start_topic_, std::string("/start_pose"));
         nh.param("goal_topic", goal_topic_, std::string("/move_base_simple/goal"));
         nh.param("distance_threshold", distance_threshold_, 0.2);
         nh.param("wait_time", wait_time_, 0.0);
@@ -71,6 +72,7 @@ public:
                      waypoints_[i].pose.position.z);
         }
 
+        start_pub_ = nh.advertise<geometry_msgs::PoseStamped>(start_topic_, 10);
         goal_pub_ = nh.advertise<geometry_msgs::PoseStamped>(goal_topic_, 10);
 
         if (!odom_topic_.empty())
@@ -86,6 +88,7 @@ public:
 
         //trans_sub_ = nh.subscribe("/map_to_odom", 2, &WaypointPublisher::map2odomCallback, this);
         srv_takeoff_ = nh.advertiseService("/takeoff_notify", &WaypointPublisher::takeoffCallback, this);
+        srv_planfail_ = nh.advertiseService("/planner_fail_notify", &WaypointPublisher::planfailCallback, this);
         timeout_timer_ = nh.createTimer(ros::Duration(5.0), &WaypointPublisher::timeoutCheckCallback, this);
 
         current_wp_idx_ = 0;
@@ -155,6 +158,7 @@ public:
         if (reached_ && (ros::Time::now() - reach_time_).toSec() >= wait_time_)
         {
             current_wp_idx_ += 1;
+            current_wp_retry_times_ = 0;
             if(mission_cycle_)
             {
                 current_wp_idx_ %= waypoints_.size();
@@ -185,6 +189,15 @@ public:
                      waypoints_[current_wp_idx_].pose.position.y,
                      waypoints_[current_wp_idx_].pose.position.z);
         }
+    }
+
+    void publishStart()
+    {
+        start_pub_.publish(current_pose_);
+        ROS_INFO("[mission] Published start pose: (%.2f, %.2f, %.2f)",
+                 current_pose_.pose.position.x,
+                 current_pose_.pose.position.y,
+                 current_pose_.pose.position.z);
     }
 
     void map2odomCallback(const nav_msgs::Odometry::ConstPtr &msg)
@@ -227,6 +240,26 @@ public:
             ROS_INFO("[mission] UAV has taken off!");
             res.response = "Hello, world!";
             takeoff_done_ = true;
+            publishStart();
+        }
+        return true;
+    }
+
+    bool planfailCallback(uav_px4_ctrl::TakeoffNotify::Request &req,
+                         uav_px4_ctrl::TakeoffNotify::Response &res)
+    {
+        if (req.takeoff_done)
+        {
+            if(current_wp_retry_times_ > 3)
+            {
+                ROS_INFO("[mission] Planner has failed! All retries have been used up!");
+                shutdown_requested_ = true;
+                return false;
+            }
+            ROS_INFO("[mission][%d/3] Planner has failed! Retrying...", ++current_wp_retry_times_);
+            res.response = "Hello, world!";
+            publishStart();
+            publishGoal();
         }
         return true;
     }
@@ -274,11 +307,13 @@ public:
     }
 
 private:
+    ros::Publisher start_pub_;
     ros::Publisher goal_pub_;
     ros::Subscriber pose_sub_;
     ros::Subscriber odom_sub_;
     ros::Subscriber trans_sub_;
     ros::ServiceServer srv_takeoff_;
+    ros::ServiceServer srv_planfail_;
     ros::ServiceClient srv_accomplish_;
     ros::ServiceClient srv_abort_;
     ros::Timer timeout_timer_;
@@ -288,6 +323,7 @@ private:
     geometry_msgs::PoseStamped current_pose_;
     std::string pose_topic_;
     std::string odom_topic_;
+    std::string start_topic_;
     std::string goal_topic_;
     bool mission_cycle_ = false;
 
@@ -297,6 +333,7 @@ private:
     double topic_timeout_;
 
     int current_wp_idx_ = 0;
+    int current_wp_retry_times_ = 0;
     bool reached_ = false;
     bool use_odom_ = false;
     bool have_map_to_odom_ = false;

@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   pcl_conversions
   Eigen3
+  uav_px4_ctrl
 )
 
 ###################################

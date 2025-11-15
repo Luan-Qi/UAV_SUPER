@@ -1,26 +1,32 @@
 <launch>
-    <node pkg="uav_px4_ctrl" type="mission_manger" name="mission_manger" output="screen" >
-        <!-- 输入话题（odom 优先） -->
-        <param name="odom_topic" value="/localization" />
-        <param name="pose_topic" value="/mavros/local_position/pose" />
-        <param name="goal_topic" value="/goal_pose" />
+    <!-- 输入话题（odom 优先） -->
+    <arg name="odom_topic" default="/localization"/>
+    <arg name="pose_topic" default="/mavros/local_position/pose"/>
+    <arg name="goal_topic" default="/goal_pose"/>
+    <!-- 到达阈值 -->
+    <arg name="distance_threshold" default="1.0"/>
+    <!-- 到达后等待时间 -->
+    <arg name="wait_time" default="5.0"/>
+    <!-- 启动延迟时间 -->
+    <arg name="start_delay" default="3.0"/>
+    <!-- 位置话题超时时间（秒） -->
+    <arg name="topic_timeout" default="2.0"/>
+    <!-- 任务循环选项 -->
+    <arg name="mission_cycle" default="false"/>
+    <!-- 路径点 -->
+    <arg name="waypoints" default="[[52.0, -10.0, 0.6], [52.0, -0.0, 0.6]]"/>
 
-        <!-- 到达阈值 -->
-        <param name="distance_threshold" value="1.0" />
-
-        <!-- 到达后等待时间 -->
-        <param name="wait_time" value="5.0" />
-
-        <!-- 启动延迟时间 -->
-        <param name="start_delay" value="3.0" />
-
-        <!-- 位置话题超时时间（秒） -->
-        <param name="topic_timeout" value="2.0" />
-
-        <!-- 任务循环选项 -->
-        <param name="mission_cycle" value="false" />
-
-        <!-- 路径点 -->
-        <param name="waypoints" value="[[52.0, -10.0, 0.6], [52.0, -0.0, 0.6]]"/>
+    <!-- 使用参数 -->
+    <node pkg="uav_px4_ctrl" type="mission_manger" name="mission_manger" output="screen">
+        <param name="odom_topic" value="$(arg odom_topic)"/>
+        <param name="pose_topic" value="$(arg pose_topic)"/>
+        <param name="goal_topic" value="$(arg goal_topic)"/>
+        <param name="distance_threshold" value="$(arg distance_threshold)"/>
+        <param name="wait_time" value="$(arg wait_time)"/>
+        <param name="start_delay" value="$(arg start_delay)"/>
+        <param name="topic_timeout" value="$(arg topic_timeout)"/>
+        <param name="mission_cycle" value="$(arg mission_cycle)"/>
+        <param name="waypoints" value="$(arg waypoints)"/>
     </node>
 </launch>
+

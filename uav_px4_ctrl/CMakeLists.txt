@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   mavros_msgs
   quadrotor_msgs
   tf2
+  tf2_msgs
   tf2_geometry_msgs
   message_generation
 )

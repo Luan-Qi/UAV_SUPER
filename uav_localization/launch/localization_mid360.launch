@@ -17,7 +17,7 @@
 <launch>
     <param name="/use_sim_time" value="true" />
     <arg name="use_bag" default="true" />
-
+    <arg name="rviz" default="true" />
 
     <param name="robot_description"
         textfile="$(find uav_localization)/urdf/uav_super.urdf" />
@@ -44,6 +44,8 @@
 	    <node name="playbag" pkg="rosbag" type="play" args="--clock /mnt/nvme/rosbag/float2-simple.bag -r 1 -s 30" />
 	</group>
 
-    <node name="rviz" pkg="rviz" type="rviz" required="true"
-        args="-d $(find uav_localization)/config/demo_3d.rviz" />
+    <group if="$(arg rviz)">
+        <node name="rviz" pkg="rviz" type="rviz"
+            args="-d $(find uav_localization)/config/demo_3d.rviz" />
+    </group>
 </launch>

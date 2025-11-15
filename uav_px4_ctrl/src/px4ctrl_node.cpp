@@ -521,6 +521,8 @@ int main(int argc, char *argv[])
         ros::Duration(0.1).sleep();
     }
 
+    ROS_INFO("[PX4CTRL] Mode: %s, Battery: %.1f V, Current: %.2f A", 
+        node.state_data.current_state.mode.c_str(), node.battery_data.battery.voltage, node.battery_data.battery.current);
     ROS_INFO("[PX4CTRL] Please manually switch to offboard mode and manually arm it to automatically takeoff.");
     ros::Rate r(30.0);
     while (ros::ok())
