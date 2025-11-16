@@ -21,13 +21,11 @@
     </joint>
 
     <!-- ======================= Camera Link (可选) =============== -->
-    <!--
-    <link name="camera_link"/>
+    <link name="camera_init"/>
     <joint name="base_to_camera" type="fixed">
         <parent link="base_link"/>
-        <child link="camera_link"/>
-        <origin xyz="0.1 0.0 0.0" rpy="0 0 0"/>
+        <child link="camera_init"/>
+        <origin xyz="0 0.0 0.0" rpy="0 0 0"/>
     </joint>
-    -->
 
 </robot>

@@ -31,17 +31,16 @@
             -configuration_basename mid360_3d_localization.lua
             -load_state_filename /mnt/nvme/map.pbstream"
         output="screen">
-        <remap from="points2" to="/livox/lidar_cloud"/>
+        <remap from="points2" to="/livox/lidar"/>
         <remap from="imu" to="/livox/imu"/>
+        <remap from="/odom" to="/Odometry"/>
     </node>
 
     <node name="cartographer_occupancy_grid_node" pkg="cartographer_ros"
         type="cartographer_occupancy_grid_node" args="-resolution 0.05" />
 
-    <node pkg="uav_localization" type="livox_to_pointcloud2.py" name="livox_to_pointcloud2" output="screen"/>
-
     <group if="$(arg use_bag)">
-	    <node name="playbag" pkg="rosbag" type="play" args="--clock /mnt/nvme/rosbag/float2-simple.bag -r 1 -s 30" />
+	    <node name="playbag" pkg="rosbag" type="play" args="--clock /mnt/nvme/rosbag/float2.bag -r 1 -s 30" />
 	</group>
 
     <group if="$(arg rviz)">

@@ -1,0 +1,16 @@
+<launch>
+    <arg name="rviz" default="true" />
+
+    <!-- global localization -->
+    <include file="$(find uav_localization)/launch/mapping_mid360.launch" >
+        <arg name="use_bag" default="true" />
+        <arg name="rviz" default="true" />
+    </include>
+
+    <node pkg="uav_px4_ctrl" type="convert_tf_to_odom.py" name="convert_tf_to_odom" output="screen"/>
+
+    <!-- local Odometry for px4 flight controller -->
+    <include file="$(find fast_lio)/launch/mapping_mid360.launch" >
+        <arg name="rviz" value="false" />
+    </include>
+</launch>
