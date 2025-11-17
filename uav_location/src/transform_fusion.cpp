@@ -22,7 +22,7 @@ bool has_map_to_odom = false;
 bool have_global_start_pose = false;
 std::mutex mtx;
 
-double FREQ_PUB_LOCALIZATION = 50.0;
+double FREQ_PUB_LOCALIZATION = 30.0;
 double TAKEOFF_HEIGHT = 1.0;
 
 // -------------------- 工具函数：Pose -> Eigen::Matrix4d --------------------
@@ -58,7 +58,6 @@ void cbMapToOdom(const nav_msgs::Odometry::ConstPtr &msg)
 void transformFusion()
 {
     tf::TransformBroadcaster br;
-    //tf::TransformBroadcaster br_static;
     ros::Rate rate(FREQ_PUB_LOCALIZATION);
 
     while (ros::ok())
@@ -88,9 +87,6 @@ void transformFusion()
         tf_map_to_cam.setRotation(tf_q);
         br.sendTransform(tf::StampedTransform(tf_map_to_cam, ros::Time::now(), "map", "camera_init"));
 
-        // 
-        //br_static.sendTransform(tf::StampedTransform(tf_map_to_cam, ros::Time::now(), "map", "local"));
-
         // 如果有 odometry，则发布融合后的 localization
         if (has_odom)
         {
@@ -104,7 +100,7 @@ void transformFusion()
             nav_msgs::Odometry localization;
             localization.header.stamp = cur_odom_copy.header.stamp;
             localization.header.frame_id = "map";
-            localization.child_frame_id = "body";
+            localization.child_frame_id = "base_link";
 
             localization.pose.pose.position.x = t.x();
             localization.pose.pose.position.y = t.y();

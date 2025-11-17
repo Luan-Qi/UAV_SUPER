@@ -3,6 +3,7 @@
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/Quaternion.h>
 #include <tf/tf.h>
+#include <tf/transform_broadcaster.h>
 #include <iostream>
 
 int main(int argc, char** argv)
@@ -44,12 +45,27 @@ int main(int argc, char** argv)
     for (int i = 0; i < 36; i++)
         initial_pose.pose.covariance[i] = 0.0;
 
-    ros::Duration(1.0).sleep();  // 等待发布器连接
+    ros::Duration(0.5).sleep();  // 等待发布器连接
     ROS_INFO("[pub_init_pose] Publishing initial pose: x=%.3f y=%.3f z=%.3f yaw=%.3f pitch=%.3f roll=%.3f",
              x, y, z, yaw, pitch, roll);
     pub_pose.publish(initial_pose);
 
-    ros::spinOnce();
-    ros::Duration(0.5).sleep();  // 确保消息发出
+    tf::TransformBroadcaster br;
+    tf::Transform body_to_base;
+    body_to_base.setOrigin(tf::Vector3(x, y, z));
+    body_to_base.setRotation(tf::Quaternion(roll, pitch, yaw));
+
+    ros::Rate rate(10);
+    while (ros::ok())
+    {
+        // // 保持固定姿态和位置
+        // br.sendTransform(tf::StampedTransform(body_to_base,
+        //                                       ros::Time::now(),
+        //                                       "body",
+        //                                       "base_link"));
+        ros::spinOnce();
+        rate.sleep();
+    }
+
     return 0;
 }

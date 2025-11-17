@@ -1,6 +1,7 @@
 <launch>
+    <arg name="use_sim_time" default="true" />
+    <param name="/use_sim_time" value="$(arg use_sim_time)" />
     <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor2-1-good_downsampled.pcd"/>
-    <arg name="rviz" default="true" />
 
 
     <!-- global locatization main -->
@@ -24,7 +25,7 @@
 
 
     <!-- provide a estimate pose for global locatization -->
-    <arg name="init_x" default="0.0" />
+    <arg name="init_x" default="35.0" />
     <arg name="init_y" default="0.0" />
     <arg name="init_z" default="0.0" />
     <arg name="init_roll" default="0.0" />
@@ -50,10 +51,7 @@
     <include file="$(find fast_lio)/launch/mapping_mid360.launch" >
         <arg name="rviz" value="false" />
     </include>
-
-
-    <!-- local Odometry display in rviz -->
-    <node pkg="uav_location" type="odom_republisher" name="odom_republisher" output="screen" />
+    <param name="/pcd_save/pcd_save_en" value="false" />
 
 
     <!-- global map -->
@@ -96,8 +94,10 @@
     <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" />
     
 
-    <group if="$(arg rviz)">
-	    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz_planner" 
-              args="-d $(find uav_location)/rviz/global_planner.rviz" />
+    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz_planner" 
+            args="-d $(find uav_location)/rviz/global_planner.rviz" />
+
+    <group if="$(arg use_sim_time)">
+	    <node name="playbag" pkg="rosbag" type="play" args="--clock /mnt/nvme/rosbag/float2.bag -r 1 -s 66" />
 	</group>
 </launch>

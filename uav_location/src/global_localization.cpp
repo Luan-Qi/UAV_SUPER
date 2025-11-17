@@ -36,6 +36,7 @@ nav_msgs::Odometry::ConstPtr cur_odom_msg;
 std::atomic<bool> got_global_map(false);
 std::atomic<bool> got_scan(false);
 std::atomic<bool> initialized(false);
+Eigen::Matrix4f initial;
 
 double MAP_VOXEL_SIZE = 0.4;
 double SCAN_VOXEL_SIZE = 0.1;
@@ -162,27 +163,62 @@ CloudT::Ptr cropGlobalMapInFOV(const CloudT::Ptr &global_map_in,
     return out;
 }
 
- CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud, 
-                                      const nav_msgs::Odometry::ConstPtr& center_point, 
-                                      double radius) {
-        CloudT::Ptr filtered_cloud(new CloudT);
-        filtered_cloud->header = input_cloud->header;
-        filtered_cloud->is_dense = input_cloud->is_dense;
+CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud, 
+                                     const nav_msgs::Odometry::ConstPtr& center_point, 
+                                     double radius) 
+{
+    CloudT::Ptr filtered_cloud(new CloudT);
+    filtered_cloud->header = input_cloud->header;
+    filtered_cloud->is_dense = input_cloud->is_dense;
+    
+    for (const auto& point : input_cloud->points) {
+        // 计算点到中心的XY平面距离
+        double dx = point.x - center_point->pose.pose.position.x;
+        double dy = point.y - center_point->pose.pose.position.y;
+        double distance = sqrt(dx * dx + dy * dy);
         
-        for (const auto& point : input_cloud->points) {
-            // 计算点到中心的XY平面距离
-            double dx = point.x - center_point->pose.pose.position.x;
-            double dy = point.y - center_point->pose.pose.position.y;
-            double distance = sqrt(dx * dx + dy * dy);
-            
-            // 如果距离在设定半径内，保留该点
-            if (distance <= radius) {
-                filtered_cloud->points.push_back(point);
-            }
+        // 如果距离在设定半径内，保留该点
+        if (distance <= radius) {
+            filtered_cloud->points.push_back(point);
         }
-        
-        return filtered_cloud;
     }
+    
+    return filtered_cloud;
+}
+
+CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud, 
+                                     const Eigen::Matrix4f &pose_estimation,
+                                     const nav_msgs::Odometry::ConstPtr& center_point, 
+                                     double radius) 
+{
+    CloudT::Ptr filtered_cloud(new CloudT);
+    filtered_cloud->header = input_cloud->header;
+    filtered_cloud->is_dense = input_cloud->is_dense;
+        
+    for (const auto& point : input_cloud->points) 
+    {
+        // 按中心点进行半径裁剪
+        double dx = point.x - center_point->pose.pose.position.x;
+        double dy = point.y - center_point->pose.pose.position.y;
+        double distance = std::sqrt(dx * dx + dy * dy);
+
+        if (distance <= radius) 
+        {
+            // 将点转为齐次坐标
+            Eigen::Vector4f pt(point.x, point.y, point.z, 1.0f);
+            Eigen::Vector4f pt_transformed = pose_estimation * pt;
+
+            PointT new_pt;
+            new_pt.x = pt_transformed.x();
+            new_pt.y = pt_transformed.y();
+            new_pt.z = pt_transformed.z();
+
+            filtered_cloud->points.push_back(new_pt);
+        }
+    }
+    
+    return filtered_cloud;
+}
 
 // publish pcl cloud (XYZ) as sensor_msgs::PointCloud2 with header
 void publishPointCloud(const CloudT::Ptr &cloud, const std_msgs::Header &header, ros::Publisher &pub)
@@ -299,26 +335,10 @@ void cbInitGlobalMap(const sensor_msgs::PointCloud2::ConstPtr &pc_msg)
 // initial pose callback: user might publish /initialpose -> try to initialize
 void cbInitialPose(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &pose_msg)
 {
-    if (!got_scan) {
-        ROS_WARN("[global] Initial pose received but first scan not received");
-        return;
-    }
-    // compute initial matrix
-    Eigen::Matrix4f initial = poseWithCovToMatrix(pose_msg);
-
-    // attempt localization once with this initial
-    Eigen::Matrix4f T_map_to_odom = Eigen::Matrix4f::Identity();
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        // use existing T_map_to_odom initial as identity
-    }
-    bool ok = globalLocalization(initial); // NOTE: pass initial as guess by letting function accept guess; to keep parity we will set T inside the function - simplify:
-    if (ok) {
-        initialized = true;
-        ROS_INFO("[global] Initialize successfully!!!!!!");
-    } else {
-        ROS_WARN("[global] Init localization failed");
-    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    initial = poseWithCovToMatrix(pose_msg);
+    ROS_INFO("[global] get initial pose!");
+    initialized = true;
 }
 
 // thread to run periodic localization (uses a stored T_map_to_odom)
@@ -326,7 +346,14 @@ void threadLocalization()
 {
     Eigen::Matrix4f T_map_to_odom = Eigen::Matrix4f::Identity();
     ros::Rate rate(FREQ_LOCALIZATION);
-    while (ros::ok()) {
+    while (ros::ok() && !initialized)
+    {
+        ROS_WARN_THROTTLE(5.0, "[global] Waiting for initialization...");
+        rate.sleep();
+    }
+    T_map_to_odom = initial;
+    while (ros::ok()) 
+    {
         bool ok = globalLocalization(T_map_to_odom);
         (void)ok;
         rate.sleep();

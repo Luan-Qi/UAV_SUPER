@@ -1,6 +1,6 @@
 Panels:
   - Class: rviz/Displays
-    Help Height: 0
+    Help Height: 70
     Name: Displays
     Property Tree Widget:
       Expanded:
@@ -12,7 +12,7 @@ Panels:
         - /Odometry1/Odometry1/Covariance1/Orientation1
         - /Localization1/localization1/Shape1
       Splitter Ratio: 0.590673565864563
-    Tree Height: 765
+    Tree Height: 371
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -443,7 +443,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 28.990718841552734
+      Distance: 34.31608963012695
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -451,17 +451,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 6.62529182434082
-        Y: -0.5652870535850525
-        Z: 0.3718448877334595
+        X: 2.679410457611084
+        Y: -1.2087799310684204
+        Z: -2.6567466259002686
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0597965717315674
+      Pitch: 1.024796724319458
       Target Frame: body
-      Yaw: 2.553577184677124
+      Yaw: 2.313577175140381
     Saved: ~
 Window Geometry:
   Displays:
