@@ -9,6 +9,7 @@
 #include <mavros_msgs/CommandLong.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/ExtendedState.h>
+#include <sensor_msgs/BatteryState.h>
 #include <nav_msgs/Odometry.h>
 #include <quadrotor_msgs/PositionCommand.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -97,7 +98,7 @@ public:
         state_sub = nh.subscribe<mavros_msgs::State>(
             "/mavros/state", 10, boost::bind(&State_Data_t::feed, &state_data, _1));
         
-        battery_sub = nh.subscribe<mavros_msgs::BatteryStatus>(
+        battery_sub = nh.subscribe<sensor_msgs::BatteryState>(
             "/mavros/battery", 10, boost::bind(&Battery_Data_t::feed, &battery_data, _1));
 
         cmd_sub = nh.subscribe<quadrotor_msgs::PositionCommand>(
@@ -378,7 +379,7 @@ void DroneCtrl::publish_target()
     target.pose.position.y = clamp(target.pose.position.y,  position_min_x,  position_max_x);
     target.pose.position.z = clamp(target.pose.position.z,  position_min_z,  position_max_z);
 
-    if(is_takeoff)
+    if(false)
     {
         ros::Time now = ros::Time::now();
         double dt = (now - last_target_pub).toSec();
@@ -422,15 +423,18 @@ void DroneCtrl::publish_cmd_vel()
         if (value > max_val){
             return max_val;
             ROS_WARN_THROTTLE(5.0, "[PX4CTRL] Velocity limit exceeded: %.2f > %.2f", value, max_val);}
+        else if (value < -max_val){
+            return -max_val;
+            ROS_WARN_THROTTLE(5.0, "[PX4CTRL] Velocity limit exceeded: %.2f < %.2f", value, -max_val);}
         else{
             return value;}
     };
 
-    cmd_vel.twist.linear.x = clamp(cmd_vel.twist.linear.x, -cmd_vel_max_y);
+    cmd_vel.twist.linear.x = clamp(cmd_vel.twist.linear.x,  cmd_vel_max_y);
     cmd_vel.twist.linear.y = clamp(cmd_vel.twist.linear.y,  cmd_vel_max_x);
     cmd_vel.twist.linear.z = clamp(cmd_vel.twist.linear.z,  cmd_vel_max_z);
 
-    if(is_takeoff)
+    if(false)
     {
         ros::Time now = ros::Time::now();
         double dt = (now - last_cmd_vel_pub).toSec();

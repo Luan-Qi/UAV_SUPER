@@ -1,0 +1,17 @@
+<launch>
+  <node pkg="icp_registration" type="icp_registration_node" name="icp_registration" output="screen">
+    <param name="pcd_path" value="$(find icp_registration)/map/map.pcd"/>
+    <param name="rough_leaf_size" value="0.4"/>
+    <param name="refine_leaf_size" value="0.1"/>
+    <param name="pointcloud_topic" value="/livox/lidar/pointcloud"/>
+    <param name="map_frame_id" value="map"/>
+    <param name="odom_frame_id" value="odom"/>
+    <param name="range_odom_frame_id" value="lidar_odom"/>
+    <param name="laser_frame_id" value="laser"/>
+    <param name="thresh" value="0.15"/>
+    <param name="xy_offset" value="0.2"/>
+    <param name="yaw_offset" value="30.0"/>
+    <param name="yaw_resolution" value="10.0"/>
+    <rosparam param="initial_pose">[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</rosparam>
+  </node>
+</launch>

@@ -1,7 +1,7 @@
 <launch>
     <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor3-2-good_downsampled.pcd"/>
     <arg name="pcd_frame_id" default="map"/>
-    <arg name="pcd_topic" default="/cloud_map"/>
+    <arg name="pcd_topic" default="/map"/>
 
     <node pkg="pcl_ros" type="pcd_to_pointcloud" name="pcd_to_pointcloud" output="screen" 
           args="$(arg pcd_file) _frame_id:=$(arg pcd_frame_id) _rate:=5.0 _latch:=true cloud_pcd:=$(arg pcd_topic)"/>
@@ -13,7 +13,7 @@
         <!-- maximum range to integrate (speedup!) -->
         <param name="sensor_model/max_range" value="100.0" />
         <!-- data source to integrate (PointCloud2) -->
-        <remap from="cloud_in" to="/cloud_map" />
+        <remap from="cloud_in" to="$(arg pcd_topic)" />
         <param name="pointcloud_max_z" value="10.0" />
         <param name="pointcloud_min_z" value="-10.0" />
     </node>

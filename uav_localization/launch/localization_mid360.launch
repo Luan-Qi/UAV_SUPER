@@ -15,7 +15,7 @@
 -->
 
 <launch>
-    <param name="/use_sim_time" value="true" />
+    <param name="/use_sim_time" value="false" />
     <arg name="use_bag" default="true" />
     <arg name="rviz" default="true" />
 

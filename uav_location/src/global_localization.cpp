@@ -162,6 +162,28 @@ CloudT::Ptr cropGlobalMapInFOV(const CloudT::Ptr &global_map_in,
     return out;
 }
 
+ CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud, 
+                                      const nav_msgs::Odometry::ConstPtr& center_point, 
+                                      double radius) {
+        CloudT::Ptr filtered_cloud(new CloudT);
+        filtered_cloud->header = input_cloud->header;
+        filtered_cloud->is_dense = input_cloud->is_dense;
+        
+        for (const auto& point : input_cloud->points) {
+            // 计算点到中心的XY平面距离
+            double dx = point.x - center_point->pose.pose.position.x;
+            double dy = point.y - center_point->pose.pose.position.y;
+            double distance = sqrt(dx * dx + dy * dy);
+            
+            // 如果距离在设定半径内，保留该点
+            if (distance <= radius) {
+                filtered_cloud->points.push_back(point);
+            }
+        }
+        
+        return filtered_cloud;
+    }
+
 // publish pcl cloud (XYZ) as sensor_msgs::PointCloud2 with header
 void publishPointCloud(const CloudT::Ptr &cloud, const std_msgs::Header &header, ros::Publisher &pub)
 {
@@ -191,7 +213,8 @@ bool globalLocalization(Eigen::Matrix4f &T_map_to_odom)
 
     // publish submap sparse for visualization (downsample heavier)
     CloudT::Ptr submap_vis = voxelDownSample(submap, MAP_VOXEL_SIZE);
-    std_msgs::Header hdr = cur_odom_msg->header;
+    std_msgs::Header hdr;
+    hdr.stamp = ros::Time::now();
     hdr.frame_id = "map";
     publishPointCloud(submap_vis, hdr, pub_submap);
 
@@ -226,11 +249,9 @@ bool globalLocalization(Eigen::Matrix4f &T_map_to_odom)
         map_to_odom.pose.pose.orientation.z = q.z();
         map_to_odom.pose.pose.orientation.w = q.w();
 
-        map_to_odom.header.stamp = cur_odom_msg->header.stamp;
+        map_to_odom.header.stamp = ros::Time::now();
         map_to_odom.header.frame_id = "map";
-
         pub_map_to_odom.publish(map_to_odom);
-
         return true;
     } else {
         ROS_WARN("[global] ICP not converged, fitness (pseudo)=%.3f", fitness);
@@ -252,14 +273,15 @@ void cbSaveCurScan(const sensor_msgs::PointCloud2::ConstPtr &pc_msg)
     CloudT::Ptr tmp(new CloudT);
     pcl::fromROSMsg(*pc_msg, *tmp);
     // store as cur_scan (XYZ)
-    cur_scan = tmp;
+    cur_scan = cropPointCloudByDistance(tmp, cur_odom_msg, FOV_FAR);
     got_scan = true;
 
     // publish pc_in_map equivalent - here we just reuse the incoming message header but set frame to camera_init
-    sensor_msgs::PointCloud2 outmsg = *pc_msg;
-    outmsg.header.frame_id = "camera_init";
-    outmsg.header.stamp = ros::Time::now();
-    pub_pc_in_map.publish(outmsg);
+    CloudT::Ptr scan_vis = voxelDownSample(cur_scan, SCAN_VOXEL_SIZE);
+    std_msgs::Header hdr;
+    hdr.stamp = ros::Time::now();
+    hdr.frame_id = "camera_init";
+    publishPointCloud(scan_vis, hdr, pub_pc_in_map);
 }
 
 // initialize global map callback or initial message

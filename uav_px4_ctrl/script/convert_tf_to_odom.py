@@ -8,8 +8,8 @@ class TfToOdomConverter(object):
     def __init__(self):
 
         # 想要转换的TF (根据你cartographer的配置修改)
-        self.source_frame = "camera_init"
-        self.child_frame = "body"
+        self.source_frame = "map"
+        self.child_frame = "base_link"
 
         # 发布 odom
         self.odom_pub = rospy.Publisher("/global_Odometry", Odometry, queue_size=10)

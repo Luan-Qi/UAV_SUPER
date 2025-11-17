@@ -1,4 +1,7 @@
 <launch>
-    <include file="$(find fast_lio)/launch/mapping_mid360.launch" />
+    <include file="$(find fast_lio)/launch/mapping_mid360.launch" >
+        <arg name="rviz" value="false" />
+    </include>
+    
     <node pkg="uav_px4_ctrl_test" type="px4_vel_simple_test" name="px4_vel_simple_test" output="screen" />
 </launch>

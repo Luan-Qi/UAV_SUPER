@@ -104,7 +104,7 @@ void transformFusion()
             nav_msgs::Odometry localization;
             localization.header.stamp = cur_odom_copy.header.stamp;
             localization.header.frame_id = "map";
-            localization.child_frame_id = "local";
+            localization.child_frame_id = "body";
 
             localization.pose.pose.position.x = t.x();
             localization.pose.pose.position.y = t.y();

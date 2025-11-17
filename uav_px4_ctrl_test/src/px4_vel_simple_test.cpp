@@ -9,6 +9,7 @@
 #include <mavros_msgs/CommandLong.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/ExtendedState.h>
+#include <sensor_msgs/BatteryState.h>
 #include <nav_msgs/Odometry.h>
 #include <quadrotor_msgs/PositionCommand.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -79,7 +80,7 @@ public:
         state_sub = nh.subscribe<mavros_msgs::State>(
             "/mavros/state", 10, boost::bind(&State_Data_t::feed, &state_data, _1));
         
-        battery_sub = nh.subscribe<mavros_msgs::BatteryStatus>(
+        battery_sub = nh.subscribe<sensor_msgs::BatteryState>(
             "/mavros/battery", 10, boost::bind(&Battery_Data_t::feed, &battery_data, _1));
 
         cmd_sub = nh.subscribe<quadrotor_msgs::PositionCommand>(
@@ -269,7 +270,7 @@ void DroneCtrl::process()
 
                     if(cmd_stage == 1) {
                         // X 正
-                        if(dt < 1.0) {
+                        if(dt < 3.0) {
                             quadrotor_msgs::PositionCommand cmd;
                             cmd.velocity.x = 0.5;
                             update_cmd_vel(cmd);
@@ -281,7 +282,7 @@ void DroneCtrl::process()
                     }
                     else if(cmd_stage == 2) {
                         // X 负
-                        if(dt < 1.0) {
+                        if(dt < 3.0) {
                             quadrotor_msgs::PositionCommand cmd;
                             cmd.velocity.x = -0.5;
                             update_cmd_vel(cmd);
@@ -293,9 +294,9 @@ void DroneCtrl::process()
                     }
                     else if(cmd_stage == 3) {
                         // Y 正
-                        if(dt < 1.0) {
+                        if(dt < 3.0) {
                             quadrotor_msgs::PositionCommand cmd;
-                            cmd.velocity.y = 0.5;
+                            cmd.velocity.y = -0.5;
                             update_cmd_vel(cmd);
                             publish_cmd_vel();
                         } else {
@@ -305,9 +306,9 @@ void DroneCtrl::process()
                     }
                     else if(cmd_stage == 4) {
                         // Y 负
-                        if(dt < 1.0) {
+                        if(dt < 3.0) {
                             quadrotor_msgs::PositionCommand cmd;
-                            cmd.velocity.y = -0.5;
+                            cmd.velocity.y = 0.5;
                             update_cmd_vel(cmd);
                             publish_cmd_vel();
                         } else {
@@ -317,9 +318,9 @@ void DroneCtrl::process()
                     }
                     else if(cmd_stage == 5) {
                         // Z 正
-                        if(dt < 1.0) {
+                        if(dt < 3.0) {
                             quadrotor_msgs::PositionCommand cmd;
-                            cmd.velocity.z = 0.2;
+                            cmd.velocity.z = 0.1;
                             update_cmd_vel(cmd);
                             publish_cmd_vel();
                         } else {
@@ -329,14 +330,15 @@ void DroneCtrl::process()
                     }
                     else if(cmd_stage == 6) {
                         // Z 负
-                        if(dt < 1.0) {
+                        if(dt < 3.0) {
                             quadrotor_msgs::PositionCommand cmd;
-                            cmd.velocity.z = -0.2;
+                            cmd.velocity.z = -0.1;
                             update_cmd_vel(cmd);
                             publish_cmd_vel();
                         } else {
                             // 所有阶段结束
                             cmd_finish = true;
+                            cmd_running = false;
                         }
                     }
                 }
@@ -347,6 +349,7 @@ void DroneCtrl::process()
                 if(!is_land && !is_takeoff) is_landing = true;
                 is_takeoff = false;
                 enter_hold = false;
+                cmd_finish = false;
             }
             have_hold_set = false;
         }
@@ -402,7 +405,7 @@ void DroneCtrl::publish_cmd_vel()
             return value;}
     };
 
-    cmd_vel.twist.linear.x = clamp(cmd_vel.twist.linear.x, -cmd_vel_max_y);
+    cmd_vel.twist.linear.x = clamp(cmd_vel.twist.linear.x,  cmd_vel_max_y);
     cmd_vel.twist.linear.y = clamp(cmd_vel.twist.linear.y,  cmd_vel_max_x);
     cmd_vel.twist.linear.z = clamp(cmd_vel.twist.linear.z,  cmd_vel_max_z);
     vel_pub.publish(cmd_vel);

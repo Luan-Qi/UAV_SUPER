@@ -9,6 +9,7 @@
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/BatteryStatus.h>
 #include <mavros_msgs/ExtendedState.h>
+#include <sensor_msgs/BatteryState.h>
 
 class RC_Data_t
 {
@@ -80,11 +81,11 @@ public:
 class Battery_Data_t
 {
 public:
-    mavros_msgs::BatteryStatus battery;
+    sensor_msgs::BatteryState battery;
     ros::Time rcv_stamp;
 
     Battery_Data_t();
-    void feed(mavros_msgs::BatteryStatusConstPtr pMsg);
+    void feed(sensor_msgs::BatteryStateConstPtr pMsg);
     bool is_received(const ros::Time &now_time);
 };
 

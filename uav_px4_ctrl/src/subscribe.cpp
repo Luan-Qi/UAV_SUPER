@@ -153,7 +153,7 @@ Battery_Data_t::Battery_Data_t()
     rcv_stamp = ros::Time(0);
 }
 
-void Battery_Data_t::feed(mavros_msgs::BatteryStatusConstPtr pMsg)
+void Battery_Data_t::feed(sensor_msgs::BatteryStateConstPtr pMsg)
 {
     battery = *pMsg;
     rcv_stamp = ros::Time::now();
