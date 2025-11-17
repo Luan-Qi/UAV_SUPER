@@ -2,6 +2,7 @@
     <arg name="use_sim_time" default="true" />
     <param name="/use_sim_time" value="$(arg use_sim_time)" />
     <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor2-1-good_downsampled.pcd"/>
+    <arg name="global_Odometry" default="/localization"/>
 
 
     <!-- global locatization main -->
@@ -25,7 +26,7 @@
 
 
     <!-- provide a estimate pose for global locatization -->
-    <arg name="init_x" default="35.0" />
+    <arg name="init_x" default="0.0" />
     <arg name="init_y" default="0.0" />
     <arg name="init_z" default="0.0" />
     <arg name="init_roll" default="0.0" />
@@ -76,8 +77,9 @@
     </include>
 
 
-    <!-- trace local odom to local path -->
+    <!-- trace global odom to global path -->
     <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
+        <param name="odom_topic" value="$(arg global_Odometry)"/>
         <param name="goal_distance_threshold" value="0.3"/>
         <param name="path_step" value="2"/>
         <param name="publish_rate" value="5.0"/>
@@ -86,18 +88,21 @@
 
     <!-- local planner main -->
     <include file="$(find ego_planner)/launch/single_run_in_exp.launch" >
-        <arg name="odom_topic" value="/Odometry"/>
+        <arg name="odom_topic" value="$(arg global_Odometry)"/>
     </include>
 
 
     <!-- mission manager main -->
-    <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" />
+    <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" >
+        <arg name="odom_topic" value="$(arg global_Odometry)"/>
+        <arg name="waypoints" value="[[35.0, 0.0, 0.6], [52.0, -10.0, 0.8], [0.0, -0.0, 0.6]]"/>
+    </include>
     
 
     <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz_planner" 
             args="-d $(find uav_location)/rviz/global_planner.rviz" />
 
     <group if="$(arg use_sim_time)">
-	    <node name="playbag" pkg="rosbag" type="play" args="--clock /mnt/nvme/rosbag/float2.bag -r 1 -s 66" />
+	    <node name="playbag" pkg="rosbag" type="play" args="--clock /mnt/nvme/rosbag/float2.bag -r 1 -s 0" />
 	</group>
 </launch>
