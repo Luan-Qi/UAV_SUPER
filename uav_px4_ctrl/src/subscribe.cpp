@@ -200,7 +200,7 @@ void Command_Data_t::feed(quadrotor_msgs::PositionCommandConstPtr pMsg)
 
 bool Command_Data_t::is_received(const ros::Time &now_time)
 {
-	return (now_time - this->rcv_stamp).toSec() < 0.5;
+	return (now_time - this->rcv_stamp).toSec() < 0.1;
 }
 
 

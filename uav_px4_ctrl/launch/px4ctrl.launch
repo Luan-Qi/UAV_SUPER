@@ -1,6 +1,6 @@
 <launch>
     <!-- velocity control or position control -->
-    <arg name="control_mode" default="velocity" />
+    <arg name="control_mode" default="position" />
     <arg name="battery_limit" default="17.4" />
 
     <!-- position control parameters -->
@@ -14,8 +14,8 @@
     <arg name="position_max_acc" value="6.0" />
 
     <!-- velocity control parameters -->
-    <arg name="cmd_vel_max_x" value="1.0" />
-    <arg name="cmd_vel_max_y" value="1.0" />
+    <arg name="cmd_vel_max_x" value="0.5" />
+    <arg name="cmd_vel_max_y" value="0.5" />
     <arg name="cmd_vel_max_z" value="0.5" />
     <arg name="cmd_vel_max_acc" value="5.0" />
     <arg name="cmd_vel_max_jerk" value="5.0" />

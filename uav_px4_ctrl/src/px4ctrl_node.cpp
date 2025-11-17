@@ -141,6 +141,7 @@ public:
     void update_target(const nav_msgs::Odometry& target);
     void update_target(const quadrotor_msgs::PositionCommand& target);
     void update_cmd_vel(const quadrotor_msgs::PositionCommand& msg);
+    void clear_cmd_vel();
     void process();
     void publish_target();
     void publish_cmd_vel();
@@ -241,6 +242,7 @@ void DroneCtrl::update_target(const quadrotor_msgs::PositionCommand& target)
 
 void DroneCtrl::update_cmd_vel(const quadrotor_msgs::PositionCommand& msg)
 {
+    desired_cmd_vel.header.stamp = ros::Time::now();
     desired_cmd_vel.twist.linear.x = msg.velocity.x;
     desired_cmd_vel.twist.linear.y = msg.velocity.y;
     desired_cmd_vel.twist.linear.z = msg.velocity.z;
@@ -248,6 +250,17 @@ void DroneCtrl::update_cmd_vel(const quadrotor_msgs::PositionCommand& msg)
     //desired_cmd_vel.twist.angular.y = 0.0;
     //desired_cmd_vel.twist.angular.z = msg->yaw_dot;
     uav_mavros_cmd_vel_fix(&desired_cmd_vel);
+}
+
+void DroneCtrl::clear_cmd_vel()
+{
+    desired_cmd_vel.header.stamp = ros::Time::now();
+    desired_cmd_vel.twist.linear.x = 0;
+    desired_cmd_vel.twist.linear.y = 0;
+    desired_cmd_vel.twist.linear.z = 0;
+    desired_cmd_vel.twist.angular.x = 0.0;
+    desired_cmd_vel.twist.angular.y = 0.0;
+    desired_cmd_vel.twist.angular.z = 0.0;
 }
 
 void DroneCtrl::process()
@@ -299,7 +312,7 @@ void DroneCtrl::process()
                 is_land = false;
             }
 
-            if(odom_data.msg.pose.pose.position.z > takeoff_height - 0.5 && !is_takeoff) 
+            if(odom_data.msg.pose.pose.position.z > takeoff_height - 0.1 && !is_takeoff) 
             {
                 uav_px4_ctrl::TakeoffNotify srv;
                 srv.request.takeoff_done = true;
@@ -321,7 +334,8 @@ void DroneCtrl::process()
                         publish_target();
                         break;
                     case 1:
-                        if(cmd_is_received(ros::Time::now())) update_cmd_vel(cmd_data.msg);
+                        if(cmd_is_received(ros::Time::now())){update_cmd_vel(cmd_data.msg);}
+                        else{clear_cmd_vel();}
                         publish_cmd_vel();
                         break;
                     case 2:
