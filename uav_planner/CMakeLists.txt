@@ -48,6 +48,6 @@ add_executable(transform_path src/transform_path.cpp)
 target_link_libraries(transform_path ${catkin_LIBRARIES})
 add_dependencies(transform_path ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(path_follower src/simple_path_follower.cpp)
+add_executable(path_follower src/simple_path_follower/simple_path_follower.cpp src/simple_path_follower/visual_path_follower.cpp)
 target_link_libraries(path_follower ${catkin_LIBRARIES})
 add_dependencies(path_follower ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

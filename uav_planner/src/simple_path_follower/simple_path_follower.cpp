@@ -2,13 +2,16 @@
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <Eigen/Dense>
 #include <cmath>
+#include "visual_path_follower.h"
 
 nav_msgs::Path local_path;
 nav_msgs::Odometry cur_map_to_odom;
 geometry_msgs::PoseStamped current_goal;
 geometry_msgs::PoseStamped current_pose;
+geometry_msgs::PoseStamped prev_goal;
 Eigen::Matrix4d T_odom_to_map;
 
 bool has_path = false;
@@ -21,7 +24,11 @@ int current_index = 0;
 double goal_distance_threshold = 0.5; // 到达目标的判定距离
 int path_step = 5; // 每隔几个点发送一次目标
 double publish_rate = 5.0; // Hz
+double lookahead_dist = 1.2; // 前瞻距离
 std::string path_topic, odom_topic, goal_topic, map_to_odom_topic;
+
+visualization_msgs::MarkerArray marker_array;
+int id = 0;
 
 // -------------------- Pose -> Eigen::Matrix4d --------------------
 Eigen::Matrix4d poseToMatrix(const geometry_msgs::Pose &pose)
@@ -143,19 +150,28 @@ bool is_in_sphere()
             reached_goal = true;
 
         // //Debug
-        // ROS_INFO_THROTTLE(0.5,
-        //     "[path_follower_3d] Check sphere: remain=%.2f radius=%.2f dist_center=%.2f -> %s",
-        //     remain_dist, radius, dist_to_center,
-        //     reached_goal ? "ENTER" : "OUT");
+        viz_utils::addSphere(marker_array, center, radius, id++);
+        ROS_INFO_THROTTLE(0.5,
+            "[path_follower_3d] Check sphere: remain=%.2f radius=%.2f dist_center=%.2f -> %s",
+            remain_dist, radius, dist_to_center,
+            reached_goal ? "ENTER" : "OUT");
     }
     else
     {
         // 第一个点：仍然使用传统距离判断
+        Eigen::Vector3d center(
+            current_goal.pose.position.x,
+            current_goal.pose.position.y,
+            current_goal.pose.position.z);
+        viz_utils::addSphere(marker_array, center, goal_distance_threshold, id++);
+        
         if (distance3D(current_pose, current_goal) < goal_distance_threshold)
             reached_goal = true;
     }
     return reached_goal;
 }
+
+
 
 int main(int argc, char** argv)
 {
@@ -166,6 +182,7 @@ int main(int argc, char** argv)
     nh.param("goal_distance_threshold", goal_distance_threshold, 0.5);
     nh.param("path_step", path_step, 5);
     nh.param("publish_rate", publish_rate, 5.0);
+    nh.param("lookahead_distance", lookahead_dist, 1.2);
     nh.param<std::string>("path_topic", path_topic, "/global_path");
     nh.param<std::string>("odom_topic", odom_topic, "/localization");
     nh.param<std::string>("goal_topic", goal_topic, "/move_base_simple/goal");
@@ -175,6 +192,8 @@ int main(int argc, char** argv)
     ros::Subscriber sub_odom = nh.subscribe(odom_topic, 1, cbOdom);
     ros::Subscriber sub_map_to_odom = nh.subscribe(map_to_odom_topic, 3, cbMapToOdom);
     ros::Publisher pub_goal = nh.advertise<geometry_msgs::PoseStamped>(goal_topic, 1);
+
+    ros::Publisher pub_marker_array = nh.advertise<visualization_msgs::MarkerArray>("/path_follower_debug_array", 10);
 
     ros::Rate rate(publish_rate);
 
@@ -193,7 +212,37 @@ int main(int argc, char** argv)
                 {
                     current_goal = local_path.poses[current_index];
 
-                    Eigen::Matrix4d T_global = poseToMatrix(current_goal.pose);
+                    if (current_index >= path_step)
+                        prev_goal = local_path.poses[current_index - path_step];
+                    else
+                        prev_goal = current_goal;
+
+                    Eigen::Vector3d P_prev(
+                        prev_goal.pose.position.x,
+                        prev_goal.pose.position.y,
+                        prev_goal.pose.position.z
+                    );
+
+                    Eigen::Vector3d P_cur(
+                        current_goal.pose.position.x,
+                        current_goal.pose.position.y,
+                        current_goal.pose.position.z
+                    );
+
+                    Eigen::Vector3d dir = P_cur - P_prev;
+                    if (dir.norm() > 1e-3)
+                        dir.normalize();
+                    else
+                        dir = Eigen::Vector3d(0,0,0);
+
+                    Eigen::Vector3d P_lookahead = P_cur + dir * lookahead_dist;
+
+                    geometry_msgs::PoseStamped lookahead_goal = current_goal;
+                    lookahead_goal.pose.position.x = P_lookahead.x();
+                    lookahead_goal.pose.position.y = P_lookahead.y();
+                    lookahead_goal.pose.position.z = P_lookahead.z();
+
+                    Eigen::Matrix4d T_global = poseToMatrix(lookahead_goal.pose);
                     Eigen::Matrix4d T_local = T_odom_to_map * T_global;
                     geometry_msgs::PoseStamped current_goal_local;
                     current_goal_local.header = current_goal.header;
@@ -203,11 +252,11 @@ int main(int argc, char** argv)
 
                     ROS_INFO("[path_follower_3d] New goal #%d: (x=%.1f, y=%.1f, z=%.1f)",
                              current_index,
-                             current_goal.pose.position.x,
-                             current_goal.pose.position.y,
-                             current_goal.pose.position.z);
+                             current_goal_local.pose.position.x,
+                             current_goal_local.pose.position.y,
+                             current_goal_local.pose.position.z);
 
-                    if (need_finished){has_finished = true;continue;}
+                    if (need_finished){has_finished = true;need_finished=false;continue;}
                     current_index += path_step;
                     if (current_index >= (int)local_path.poses.size())
                     {
@@ -215,6 +264,9 @@ int main(int argc, char** argv)
                         need_finished = true;
                     }
                 }
+                pub_marker_array.publish(marker_array);
+                marker_array.markers.clear();
+                id = 0;
             }
             else
             {
