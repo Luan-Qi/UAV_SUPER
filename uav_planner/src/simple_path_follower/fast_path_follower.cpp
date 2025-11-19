@@ -11,7 +11,6 @@ nav_msgs::Path local_path;
 nav_msgs::Odometry cur_map_to_odom;
 geometry_msgs::PoseStamped current_goal;
 geometry_msgs::PoseStamped current_pose;
-geometry_msgs::PoseStamped prev_goal;
 Eigen::Matrix4d T_odom_to_map;
 
 bool has_path = false;
@@ -96,81 +95,6 @@ double distance3D(const geometry_msgs::PoseStamped& a, const geometry_msgs::Pose
     return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-// 工具函数：向量归一化
-Eigen::Vector3d normalize(const Eigen::Vector3d &v)
-{
-    if (v.norm() < 1e-6) return Eigen::Vector3d(0,0,0);
-    return v.normalized();
-}
-
-bool is_in_sphere()
-{
-    bool reached_goal = false;
-
-    if (current_index >= path_step * 2)
-    {
-        geometry_msgs::PoseStamped prev_goal = local_path.poses[current_index - path_step * 2];
-
-        // 方向向量（从 prev → current）
-        Eigen::Vector3d prev(
-            prev_goal.pose.position.x,
-            prev_goal.pose.position.y,
-            prev_goal.pose.position.z);
-
-        Eigen::Vector3d cur(
-            current_goal.pose.position.x,
-            current_goal.pose.position.y,
-            current_goal.pose.position.z);
-
-        Eigen::Vector3d last(
-            local_path.poses.back().pose.position.x,
-            local_path.poses.back().pose.position.y,
-            local_path.poses.back().pose.position.z);
-
-        Eigen::Vector3d dir = normalize(cur - prev);
-
-        // 当前目标点到最终点的距离（路径剩余长度）
-        double remain_dist = (last - cur).norm();
-
-        // 球心：沿当前方向延长 remain_dist
-        Eigen::Vector3d center = cur + dir * remain_dist;
-
-        // 球半径
-        double radius = remain_dist + goal_distance_threshold;
-
-        // 当前位姿
-        Eigen::Vector3d cur_pos(
-            current_pose.pose.position.x,
-            current_pose.pose.position.y,
-            current_pose.pose.position.z);
-
-        // 判断是否进入球体
-        double dist_to_center = (cur_pos - center).norm();
-        if (dist_to_center < radius)
-            reached_goal = true;
-
-        // //Debug
-        viz_utils::addSphere(marker_array, center, radius, id++);
-        ROS_INFO_THROTTLE(0.5,
-            "[path_follower_3d] Check sphere: remain=%.2f radius=%.2f dist_center=%.2f -> %s",
-            remain_dist, radius, dist_to_center,
-            reached_goal ? "ENTER" : "OUT");
-    }
-    else
-    {
-        // 第一个点：仍然使用传统距离判断
-        Eigen::Vector3d center(
-            current_goal.pose.position.x,
-            current_goal.pose.position.y,
-            current_goal.pose.position.z);
-        viz_utils::addSphere(marker_array, center, goal_distance_threshold, id++);
-        
-        if (distance3D(current_pose, current_goal) < goal_distance_threshold)
-            reached_goal = true;
-    }
-    return reached_goal;
-}
-
 
 
 int main(int argc, char** argv)
@@ -198,7 +122,7 @@ int main(int argc, char** argv)
     ros::Rate rate(publish_rate);
 
     ROS_INFO("[path_follower_3d] Node started. Waiting for /path, /odom, /T...");
-    current_index = path_step;
+    current_index = 1;
 
     while (ros::ok())
     {
@@ -208,42 +132,17 @@ int main(int argc, char** argv)
         {
             if (!has_finished)
             {
-                //if (distance3D(current_pose, current_goal) < goal_distance_threshold || current_goal.header.seq == 0)
-                if (is_in_sphere() || current_index == 0)
+                if (distance3D(current_pose, current_goal) < goal_distance_threshold)
                 {
                     current_goal = local_path.poses[current_index];
 
-                    if (current_index >= path_step)
-                        prev_goal = local_path.poses[current_index - path_step];
-                    else
-                        prev_goal = current_goal;
-
-                    Eigen::Vector3d P_prev(
-                        prev_goal.pose.position.x,
-                        prev_goal.pose.position.y,
-                        prev_goal.pose.position.z
-                    );
-
-                    Eigen::Vector3d P_cur(
+                    Eigen::Vector3d center(
                         current_goal.pose.position.x,
                         current_goal.pose.position.y,
-                        current_goal.pose.position.z
-                    );
+                        current_goal.pose.position.z);
+                    viz_utils::addSphere(marker_array, center, goal_distance_threshold, id++);
 
-                    Eigen::Vector3d dir = P_cur - P_prev;
-                    if (dir.norm() > 1e-3)
-                        dir.normalize();
-                    else
-                        dir = Eigen::Vector3d(0,0,0);
-
-                    Eigen::Vector3d P_lookahead = P_cur + dir * lookahead_dist;
-
-                    geometry_msgs::PoseStamped lookahead_goal = current_goal;
-                    lookahead_goal.pose.position.x = P_lookahead.x();
-                    lookahead_goal.pose.position.y = P_lookahead.y();
-                    lookahead_goal.pose.position.z = P_lookahead.z();
-
-                    Eigen::Matrix4d T_global = poseToMatrix(lookahead_goal.pose);
+                    Eigen::Matrix4d T_global = poseToMatrix(current_goal.pose);
                     Eigen::Matrix4d T_local = T_odom_to_map * T_global;
                     geometry_msgs::PoseStamped current_goal_local;
                     current_goal_local.header = current_goal.header;
@@ -258,22 +157,20 @@ int main(int argc, char** argv)
                              current_goal_local.pose.position.z);
 
                     if (need_finished){has_finished = true;need_finished=false;continue;}
-                    current_index += path_step;
+
+                    current_index ++;
                     if (current_index >= (int)local_path.poses.size())
-                    {
-                        current_index = local_path.poses.size() - 1;
                         need_finished = true;
-                    }
                 }
                 pub_marker_array.publish(marker_array);
-                marker_array.markers.clear();
-                id = 0;
             }
             else
             {
                 ROS_INFO("[path_follower_3d] Path finished.");
                 has_path = false;
-                current_index = path_step;
+                current_index = 1;
+                marker_array.markers.clear();
+                id = 0;
             }
         }
 

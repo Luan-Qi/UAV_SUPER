@@ -51,3 +51,16 @@ add_dependencies(transform_path ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXP
 add_executable(path_follower src/simple_path_follower/simple_path_follower.cpp src/simple_path_follower/visual_path_follower.cpp)
 target_link_libraries(path_follower ${catkin_LIBRARIES})
 add_dependencies(path_follower ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(fast_path_follower src/simple_path_follower/fast_path_follower.cpp src/simple_path_follower/visual_path_follower.cpp)
+target_link_libraries(fast_path_follower ${catkin_LIBRARIES})
+add_dependencies(fast_path_follower ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+
+add_executable(dp_path_simplify src/path_simplify/DP_path_simplify.cpp)
+target_link_libraries(dp_path_simplify ${catkin_LIBRARIES})
+add_dependencies(dp_path_simplify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(greedy_path_simplify src/path_simplify/greedy_path_simplify.cpp)
+target_link_libraries(greedy_path_simplify ${catkin_LIBRARIES})
+add_dependencies(greedy_path_simplify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
