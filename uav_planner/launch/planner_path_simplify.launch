@@ -1,19 +1,19 @@
 <launch>
-    <arg name="planner_type" default="greedy" />
+    <arg name="planner_type" default="dp" />
 
     <node name="dp_path_simplify" pkg="uav_planner" type="dp_path_simplify" output="screen"
           if="$(eval arg('planner_type') == 'dp')">
-        <param name="input_topic" value="/global_path"/>
-        <param name="output_topic" value="/global_path_simple"/>
+        <param name="input_topic" value="/global_path_raw"/>
+        <param name="output_topic" value="/global_path"/>
         <param name="simplification_threshold" value="0.25"/>
         <param name="min_segment_length" value="0.5"/>
     </node>
 
     <node name="greedy_path_simplify" pkg="uav_planner" type="greedy_path_simplify" output="screen"
           if="$(eval arg('planner_type') == 'greedy')">
-        <param name="input_topic" value="/global_path" />
+        <param name="input_topic" value="/global_path_raw" />
         <param name="map_topic" value="/astar_planner_node/obstacle_cloud" />
-        <param name="output_topic" value="/global_path_simple" />
+        <param name="output_topic" value="/global_path" />
         <param name="check_step_size" value="0.1" />
         <param name="collision_radius" value="0.09" />
     </node>

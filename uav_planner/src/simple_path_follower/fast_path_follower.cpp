@@ -68,7 +68,7 @@ void cbPath(const nav_msgs::Path::ConstPtr& msg)
     local_path = *msg;
     has_path = true;
     has_finished = false;
-    current_index = 0;
+    current_index = 1;
     ROS_INFO("[path_follower_3d] Received new path with %lu points.", msg->poses.size());
 }
 
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
         {
             if (!has_finished)
             {
-                if (distance3D(current_pose, current_goal) < goal_distance_threshold)
+                if (distance3D(current_pose, current_goal) < goal_distance_threshold || current_index == 1)
                 {
                     current_goal = local_path.poses[current_index];
 
@@ -158,7 +158,7 @@ int main(int argc, char** argv)
 
                     if (need_finished){has_finished = true;need_finished=false;continue;}
 
-                    current_index ++;
+                    current_index++;
                     if (current_index >= (int)local_path.poses.size())
                         need_finished = true;
                 }
@@ -172,6 +172,10 @@ int main(int argc, char** argv)
                 marker_array.markers.clear();
                 id = 0;
             }
+        }
+        else
+        {
+            ROS_INFO_THROTTLE(5.0, "[path_follower_3d] Waiting for %s%s%s", has_path ? "" : "path,", has_pose ? "" : "pose,", has_map_to_odom ? "" : "T");
         }
 
         rate.sleep();

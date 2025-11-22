@@ -48,6 +48,7 @@ add_executable(transform_path src/transform_path.cpp)
 target_link_libraries(transform_path ${catkin_LIBRARIES})
 add_dependencies(transform_path ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+
 add_executable(path_follower src/simple_path_follower/simple_path_follower.cpp src/simple_path_follower/visual_path_follower.cpp)
 target_link_libraries(path_follower ${catkin_LIBRARIES})
 add_dependencies(path_follower ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
@@ -64,3 +65,12 @@ add_dependencies(dp_path_simplify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_E
 add_executable(greedy_path_simplify src/path_simplify/greedy_path_simplify.cpp)
 target_link_libraries(greedy_path_simplify ${catkin_LIBRARIES})
 add_dependencies(greedy_path_simplify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+
+add_executable(dc_path_smoothify src/path_smoothify/discrete_curve_path_smoothify.cpp)
+target_link_libraries(dc_path_smoothify ${catkin_LIBRARIES})
+add_dependencies(dc_path_smoothify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(bezier_path_smoothify src/path_smoothify/bezier_path_smoothify.cpp)
+target_link_libraries(bezier_path_smoothify ${catkin_LIBRARIES})
+add_dependencies(bezier_path_smoothify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

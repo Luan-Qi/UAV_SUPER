@@ -1,0 +1,22 @@
+<launch>
+    <arg name="planner_type" default="dp" />
+
+    <node name="dc_path_smoothify" pkg="uav_planner" type="dc_path_smoothify" output="screen"
+          if="$(eval arg('planner_type') == 'dc')">
+        <param name="input_topic" value="/global_path_raw"/>
+        <param name="output_topic" value="/global_path_smoothed"/>
+        <param name="weight_data" value="0.45"/>
+        <param name="weight_smooth" value="0.4"/>
+        <param name="tolerance" value="0.0001"/>
+        <param name="recaluate_orientation" value="true" />
+    </node>
+
+    <node name="bezier_path_smoothify" pkg="uav_planner" type="bezier_path_smoothify" output="screen"
+          if="$(eval arg('planner_type') == 'bezier')">
+        <param name="input_topic" value="/global_path_raw" />
+        <param name="output_topic" value="/global_path_smoothed" />
+        <param name="bezier_order" value="3" />
+        <param name="step_size" value="0.05" />
+        <param name="recaluate_orientation" value="true" />
+    </node>
+</launch>

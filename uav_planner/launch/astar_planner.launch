@@ -2,7 +2,7 @@
     <arg name="octomap_topic" default="/octomap_full" />
     <arg name="start_pose_topic" default="/start_pose" />
     <arg name="goal_pose_topic" default="/goal_pose" />
-    <arg name="global_path_topic" default="/global_path" />
+    <arg name="global_path_topic" default="/global_path_raw" />
     <arg name="enable_obstacle_show" default="true" />
     <arg name="inflater_size" default="3" />
 

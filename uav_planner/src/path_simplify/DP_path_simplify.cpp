@@ -87,7 +87,7 @@ private:
         }
 
         // 3. 打印 Debug 信息
-        ROS_INFO_STREAM("[PathSimplify] ... | Max Depth: " << max_recursion_depth);
+        ROS_INFO_STREAM("[PathSimplify] Max Depth: " << max_recursion_depth);
         ROS_INFO_STREAM("[PathSimplify] In: " << input_size 
                         << " -> Out: " << output_size 
                         << " (" << std::fixed << std::setprecision(2) << reduction_percent << "%)"

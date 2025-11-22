@@ -81,10 +81,10 @@
 
 
     <!-- trace global odom to global path -->
-    <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
+    <node pkg="uav_planner" type="fast_path_follower" name="path_follower" output="screen">
         <param name="odom_topic" value="$(arg global_Odometry)"/>
         <param name="goal_distance_threshold" value="0.4"/>
-        <param name="path_step" value="2"/>
+        <param name="path_step" value="1"/>
         <param name="publish_rate" value="10.0"/>
         <param name="lookahead_distance" value="1.0"/>
     </node>
@@ -107,7 +107,7 @@
     <!-- mission manager main -->
     <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" >
         <arg name="odom_topic" value="$(arg global_Odometry)"/>
-        <arg name="waypoints" value="[[52.0, -20.0, 0.8], [52.0, -10.0, 1.0], [0.0, -0.0, 0.6]]"/>
+        <arg name="waypoints" value="[[35.0, 0.0, 0.8], [52.0, -10.0, 1.0], [0.0, -0.0, 0.6]]"/>
     </include>
     
 
