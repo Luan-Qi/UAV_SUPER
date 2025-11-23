@@ -238,7 +238,7 @@ bool globalLocalization(Eigen::Matrix4f &T_map_to_odom)
         return false;
     }
 
-    ROS_INFO_THROTTLE(30.0, "[global] Global localization by scan-to-map matching......");
+    ROS_INFO_THROTTLE(60.0, "[global] Global localization by scan-to-map matching......");
 
     // crop map in FOV relative to current odom
     CloudT::Ptr submap = cropGlobalMapInFOV(global_map, T_map_to_odom, cur_odom_msg);
@@ -267,7 +267,7 @@ bool globalLocalization(Eigen::Matrix4f &T_map_to_odom)
     double fitness = fine.second;
 
     if (fitness > LOCALIZATION_TH) {
-        ROS_INFO("[global] Localization fitness (pseudo) = %.3f", fitness);
+        //ROS_INFO("[global] Localization fitness (pseudo) = %.3f", fitness);
         // update map->odom
         T_map_to_odom = tf_fine;
 

@@ -19,6 +19,7 @@ bool has_map_to_odom = false;
 bool need_finished = false;
 bool has_finished = false;
 int current_index = 0;
+bool first_start = false;
 
 double goal_distance_threshold = 0.5; // 到达目标的判定距离
 int path_step = 5; // 每隔几个点发送一次目标
@@ -132,8 +133,11 @@ int main(int argc, char** argv)
         {
             if (!has_finished)
             {
-                if (distance3D(current_pose, current_goal) < goal_distance_threshold || current_index == 1)
+                if (distance3D(current_pose, current_goal) < goal_distance_threshold || !first_start)
                 {
+                    first_start = true;
+                    if (need_finished){has_finished = true;need_finished=false;continue;}
+
                     current_goal = local_path.poses[current_index];
 
                     Eigen::Vector3d center(
@@ -156,11 +160,12 @@ int main(int argc, char** argv)
                              current_goal_local.pose.position.y,
                              current_goal_local.pose.position.z);
 
-                    if (need_finished){has_finished = true;need_finished=false;continue;}
-
                     current_index++;
                     if (current_index >= (int)local_path.poses.size())
+                    {
+                        current_index = local_path.poses.size() - 1;
                         need_finished = true;
+                    }
                 }
                 pub_marker_array.publish(marker_array);
             }
@@ -171,12 +176,13 @@ int main(int argc, char** argv)
                 current_index = 1;
                 marker_array.markers.clear();
                 id = 0;
+                first_start = false;
             }
         }
-        else
-        {
-            ROS_INFO_THROTTLE(5.0, "[path_follower_3d] Waiting for %s%s%s", has_path ? "" : "path,", has_pose ? "" : "pose,", has_map_to_odom ? "" : "T");
-        }
+        // else
+        // {
+        //     ROS_INFO_THROTTLE(5.0, "[path_follower_3d] Waiting for %s%s%s", has_path ? "" : "path,", has_pose ? "" : "pose,", has_map_to_odom ? "" : "T");
+        // }
 
         rate.sleep();
     }

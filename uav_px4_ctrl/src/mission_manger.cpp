@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
+#include <std_msgs/String.h>
 #include <vector>
 #include <string>
 #include <cmath>
@@ -89,6 +90,8 @@ public:
         //trans_sub_ = nh.subscribe("/map_to_odom", 2, &WaypointPublisher::map2odomCallback, this);
         srv_takeoff_ = nh.advertiseService("/takeoff_notify", &WaypointPublisher::takeoffCallback, this);
         srv_planfail_ = nh.advertiseService("/planner_fail_notify", &WaypointPublisher::planfailCallback, this);
+        srv_video_pub = nh.advertise<std_msgs::String>("/camera_recorder/record_control", 1);
+        
         timeout_timer_ = nh.createTimer(ros::Duration(5.0), &WaypointPublisher::timeoutCheckCallback, this);
 
         current_wp_idx_ = 0;
@@ -200,6 +203,14 @@ public:
                  current_pose_.pose.position.z);
     }
 
+    void sendRecordControl(bool start)
+    {
+        std_msgs::String msg;
+        msg.data = start ? "start" : "stop";
+        ROS_INFO("Video control %s", msg.data);
+        srv_video_pub.publish(msg);
+    }
+
     void map2odomCallback(const nav_msgs::Odometry::ConstPtr &msg)
     {
         if(have_map_to_odom_ || takeoff_done_) return;
@@ -254,6 +265,7 @@ public:
             {
                 ROS_INFO("[mission] Planner has failed! All retries have been used up!");
                 shutdown_requested_ = true;
+                sendRecordControl(false);
                 return false;
             }
             ROS_INFO("[mission][%d/3] Planner has failed! Retrying...", ++current_wp_retry_times_);
@@ -293,6 +305,7 @@ public:
         ROS_INFO("[mission] Waiting %.1f seconds before starting...", start_delay_);
         ros::Duration(start_delay_).sleep();
         publishGoal();
+        sendRecordControl(true);
 
         while (ros::ok())
         {
@@ -316,6 +329,8 @@ private:
     ros::ServiceServer srv_planfail_;
     ros::ServiceClient srv_accomplish_;
     ros::ServiceClient srv_abort_;
+    ros::Publisher srv_video_pub;
+
     ros::Timer timeout_timer_;
 
     std::vector<geometry_msgs::PoseStamped> waypoints_;
@@ -352,6 +367,7 @@ int main(int argc, char **argv)
 
     WaypointPublisher wp_pub(nh);
     wp_pub.spin();
+    ros::Duration(3.0).sleep();
     ros::shutdown();
     return 0;
 }
