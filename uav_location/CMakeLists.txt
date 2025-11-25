@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_conversions
   tf
   Eigen3
+  fast_gicp
 )
 
 catkin_package(
@@ -20,6 +21,8 @@ catkin_package(
 #  DEPENDS system_lib
 )
 
+message(STATUS "[uav_location] catkin include dirs: ${catkin_INCLUDE_DIRS}")
+
 include_directories(
   include/uav_location
   ${catkin_INCLUDE_DIRS}
@@ -27,7 +30,7 @@ include_directories(
 )
 
 add_executable(fast_lio_localization src/global_localization.cpp)
-target_link_libraries(fast_lio_localization ${catkin_LIBRARIES})
+target_link_libraries(fast_lio_localization ${catkin_LIBRARIES} fast_gicp)
 add_dependencies(fast_lio_localization ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_executable(publish_initial_pose src/publish_initial_pose.cpp)

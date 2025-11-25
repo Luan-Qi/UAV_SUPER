@@ -20,6 +20,9 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/registration/icp.h>
 
+#include <fast_gicp/gicp/fast_gicp.hpp>
+#include <fast_gicp/gicp/fast_vgicp.hpp>
+
 #include <tf/transform_datatypes.h>
 #include <tf/LinearMath/Transform.h>
 #include <Eigen/Core>
@@ -100,22 +103,40 @@ std::pair<Eigen::Matrix4f, double> registrationAtScale(const CloudT::Ptr &scan,
     CloudT::Ptr scan_down = voxelDownSample(scan, scan_leaf);
     CloudT::Ptr map_down = voxelDownSample(map, map_leaf);
 
-    pcl::IterativeClosestPoint<PointT, PointT> icp;
+    // pcl::IterativeClosestPoint<PointT, PointT> icp;
+    // icp.setInputSource(scan_down);
+    // icp.setInputTarget(map_down);
+    // icp.setMaximumIterations(20);
+    // icp.setMaxCorrespondenceDistance(1.0 * scale + 0.001); // tune if needed
+
+    // CloudT aligned;
+    // icp.align(aligned, initial.cast<float>());
+
+    // Eigen::Matrix4f final_tf = icp.getFinalTransformation();
+    // double fitness = icp.hasConverged() ? icp.getFitnessScore() : 1e9; // lower is better for PCL getFitnessScore
+
+    // // NOTE: PCL's getFitnessScore is a distance-based metric (lower better).
+    // // In python code fitness was high-is-better. To mimic threshold semantics we will invert:
+    // // define "pseudo-fitness" = exp(-fitness) so that higher is better, but to keep simple:
+    // // We'll map: pseudo_fitness = 1.0 / (1.0 + fitness)
+    // double pseudo_fitness = 1.0 / (1.0 + fitness);
+
+    // return std::make_pair(final_tf, pseudo_fitness);
+
+    fast_gicp::FastGICP<PointT, PointT> icp;
+    icp.setNumThreads(4); 
     icp.setInputSource(scan_down);
     icp.setInputTarget(map_down);
     icp.setMaximumIterations(20);
-    icp.setMaxCorrespondenceDistance(1.0 * scale + 0.001); // tune if needed
+    icp.setMaxCorrespondenceDistance(1.0 * scale + 0.001);
 
     CloudT aligned;
-    icp.align(aligned, initial.cast<float>());
+    icp.align(aligned, initial);
 
     Eigen::Matrix4f final_tf = icp.getFinalTransformation();
+    
+    // fast_gicp 的 fitness 计算方式与 PCL 类似
     double fitness = icp.hasConverged() ? icp.getFitnessScore() : 1e9; // lower is better for PCL getFitnessScore
-
-    // NOTE: PCL's getFitnessScore is a distance-based metric (lower better).
-    // In python code fitness was high-is-better. To mimic threshold semantics we will invert:
-    // define "pseudo-fitness" = exp(-fitness) so that higher is better, but to keep simple:
-    // We'll map: pseudo_fitness = 1.0 / (1.0 + fitness)
     double pseudo_fitness = 1.0 / (1.0 + fitness);
 
     return std::make_pair(final_tf, pseudo_fitness);

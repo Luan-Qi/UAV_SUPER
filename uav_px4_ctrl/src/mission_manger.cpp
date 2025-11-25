@@ -171,6 +171,7 @@ public:
                 if(current_wp_idx_ >= waypoints_.size())
                 {
                     ROS_INFO("[mission] All missions have been completed !");
+                    sendRecordControl(false);
                     shutdown_requested_ = true;
                     return;
                 }
@@ -206,8 +207,11 @@ public:
     void sendRecordControl(bool start)
     {
         std_msgs::String msg;
+        if(start)
+            ROS_INFO("[mission] Video control start!");
+        else
+            ROS_INFO("[mission] Video control stop!");
         msg.data = start ? "start" : "stop";
-        ROS_INFO("Video control %s", msg.data);
         srv_video_pub.publish(msg);
     }
 
@@ -265,7 +269,6 @@ public:
             {
                 ROS_INFO("[mission] Planner has failed! All retries have been used up!");
                 shutdown_requested_ = true;
-                sendRecordControl(false);
                 return false;
             }
             ROS_INFO("[mission][%d/3] Planner has failed! Retrying...", ++current_wp_retry_times_);
