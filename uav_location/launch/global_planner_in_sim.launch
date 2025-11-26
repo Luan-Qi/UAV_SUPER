@@ -70,6 +70,7 @@
         <arg name="inflater_size" value="$(arg inflater_size)" />
     </include>
 
+
     <!-- trace local odom to local path -->
     <arg name="use_smoothify" default="true" />
     <!-- smoothify_path + path_follower -->

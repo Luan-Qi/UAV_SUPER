@@ -6,9 +6,12 @@
 #include <string>
 #include <cmath>
 #include <regex>
+#include <thread>
+#include <mutex>
 #include <Eigen/Dense>
 #include "uav_px4_ctrl/TakeoffNotify.h"
 
+std::mutex mutex_;
 
 Eigen::Matrix4d poseToMatrix(const geometry_msgs::Pose &pose)
 {
@@ -123,61 +126,78 @@ public:
 
     void odomCallback(const nav_msgs::Odometry::ConstPtr &msg)
     {
+        std::lock_guard<std::mutex> lock(mutex_);
         current_pose_.pose = msg->pose.pose;
         last_pose_time_ = msg->header.stamp;
-        if(takeoff_done_) checkAndSwitchWaypoint();
     }
 
     void poseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
     {
+        std::lock_guard<std::mutex> lock(mutex_);
         current_pose_ = *msg;
         last_pose_time_ = msg->header.stamp;
-        if(takeoff_done_) checkAndSwitchWaypoint();
     }
 
-    void checkAndSwitchWaypoint()
+    void missionReset()
     {
-        if (waypoints_.empty())
-            return;
+        std::lock_guard<std::mutex> lock(mutex_);
+        mission_running_ = false;
+    }
 
-        geometry_msgs::PoseStamped target = waypoints_[current_wp_idx_];
-        double dx = target.pose.position.x - current_pose_.pose.position.x;
-        double dy = target.pose.position.y - current_pose_.pose.position.y;
-        double dz = target.pose.position.z - current_pose_.pose.position.z;
-        double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
-        //ROS_INFO("distance:%f", dist);
-
-        if (!reached_ && dist < distance_threshold_)
+    void missionCheckWaypoint()
+    {
+        ros::Rate rate(10);
+        while (ros::ok()) 
         {
-            ROS_INFO("[mission] Reached waypoint %d (%.2f, %.2f, %.2f)",
-                     current_wp_idx_ + 1,
-                     target.pose.position.x,
-                     target.pose.position.y,
-                     target.pose.position.z);
-            reached_ = true;
-            reach_time_ = ros::Time::now();
-        }
+            rate.sleep();
 
-        if (reached_ && (ros::Time::now() - reach_time_).toSec() >= wait_time_)
-        {
-            current_wp_idx_ += 1;
-            current_wp_retry_times_ = 0;
-            if(mission_cycle_)
+            if (!mission_running_) continue;
+
+            if (!reached_)
             {
-                current_wp_idx_ %= waypoints_.size();
-            }
-            else
-            {
-                if(current_wp_idx_ >= waypoints_.size())
                 {
-                    ROS_INFO("[mission] All missions have been completed !");
-                    sendRecordControl(false);
-                    shutdown_requested_ = true;
-                    return;
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    geometry_msgs::PoseStamped target = waypoints_[current_wp_idx_];
+                    double dx = target.pose.position.x - current_pose_.pose.position.x;
+                    double dy = target.pose.position.y - current_pose_.pose.position.y;
+                    double dz = target.pose.position.z - current_pose_.pose.position.z;
+                    double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+                    //ROS_INFO("distance:%f", dist);
                 }
+
+                if(dist < distance_threshold_)
+                {
+                    ROS_INFO("[mission] Reached waypoint %d (%.2f, %.2f, %.2f)",
+                             current_wp_idx_ + 1,
+                             target.pose.position.x,
+                             target.pose.position.y,
+                             target.pose.position.z);
+                    reached_ = true;
+                    reach_time_ = ros::Time::now();
+                }
+                
             }
-            publishGoal();
-            reached_ = false;
+
+            if (reached_ && (ros::Time::now() - reach_time_).toSec() >= wait_time_)
+            {
+                current_wp_idx_ += 1;
+                current_wp_retry_times_ = 0;
+                if(mission_cycle_)
+                {
+                    current_wp_idx_ %= waypoints_.size();
+                }
+                else
+                {
+                    if(current_wp_idx_ >= waypoints_.size())
+                    {
+                        ROS_INFO("[mission] All missions have been completed !");
+                        mission_running_ = false;
+                        return;
+                    }
+                }
+                publishGoal();
+                reached_ = false;
+            }
         }
     }
 
@@ -213,6 +233,74 @@ public:
             ROS_INFO("[mission] Video control stop!");
         msg.data = start ? "start" : "stop";
         srv_video_pub.publish(msg);
+    }
+
+    void processRecordingLogic(int target_index, int event_type)
+    {
+        if (target_index < 0 || target_index >= waypoint_record_flags_.size()) return;
+
+        bool current_needs_record = waypoint_record_flags_[target_index];
+        
+        // --- 事件 A: 正要发布目标点 (开始前往 target_index) ---
+        if (event_type == 0) 
+        {
+            // 规则：如果当前目标点标记了 *，则在出发时就开始录像
+            if (current_needs_record)
+            {
+                if (!is_recording_active_) 
+                {
+                    sendRecordControl(true);
+                    is_recording_active_ = true;
+                    ROS_INFO("Record Start: Dispatching to marked waypoint %d", target_index);
+                }
+            }
+            // 如果当前点没有标记，我们不做操作，
+            // 因为“停止”的动作通常由上一个点的“到达”事件处理。
+        }
+        // --- 事件 B: 已经到达目标点 (到达 target_index) ---
+        else if (event_type == 1) 
+        {
+            // 规则：到了这个点，我们需要决定是否停止
+            
+            if (current_needs_record)
+            {
+                // 如果当前点是录像点，我们需要看下一个点
+                int next_index = target_index + 1;
+                bool next_exists_and_record = false;
+
+                // 检查是否存在下一个点，且下一个点是否也需要录像
+                if (next_index < waypoint_record_flags_.size()) {
+                    if (waypoint_record_flags_[next_index]) {
+                        next_exists_and_record = true;
+                    }
+                }
+
+                // 如果下一个点不需要录像（或者没有下一个点），则停止录像
+                // 这实现了“连续两个点都需录制则不断开”的逻辑
+                if (!next_exists_and_record)
+                {
+                    if (is_recording_active_) 
+                    {
+                        sendRecordControl(false);
+                        is_recording_active_ = false;
+                        ROS_INFO("Record Stop: Arrived at %d, next point is non-record segment", target_index);
+                    }
+                }
+                else
+                {
+                    ROS_INFO("Record Continue: Arrived at %d, next point connects record segment", target_index);
+                }
+            }
+            else
+            {
+                // 如果当前点本来就不是录像点，且还在录像（异常情况），强制停止
+                if (is_recording_active_) 
+                {
+                    sendRecordControl(false);
+                    is_recording_active_ = false;
+                }
+            }
+        }
     }
 
     void map2odomCallback(const nav_msgs::Odometry::ConstPtr &msg)
@@ -268,7 +356,6 @@ public:
             if(current_wp_retry_times_ >= 3)
             {
                 ROS_INFO("[mission] Planner has failed! All retries have been used up!");
-                shutdown_requested_ = true;
                 return false;
             }
             ROS_INFO("[mission][%d/3] Planner has failed! Retrying...", ++current_wp_retry_times_);
@@ -307,16 +394,10 @@ public:
 
         ROS_INFO("[mission] Waiting %.1f seconds before starting...", start_delay_);
         ros::Duration(start_delay_).sleep();
-        publishGoal();
-        sendRecordControl(true);
+        mission_running_ = true;
 
         while (ros::ok())
         {
-            if (shutdown_requested_)
-            {
-                timeout_timer_.stop();
-                return;
-            }
             ros::spinOnce();
             rate.sleep();
         }
@@ -344,6 +425,7 @@ private:
     std::string start_topic_;
     std::string goal_topic_;
     bool mission_cycle_ = false;
+    bool mission_running_ = false;
 
     double distance_threshold_;
     double wait_time_;
@@ -356,7 +438,6 @@ private:
     bool use_odom_ = false;
     bool have_map_to_odom_ = false;
     bool takeoff_done_ = false;
-    bool shutdown_requested_ = false;
 
     nav_msgs::Odometry cur_map_to_odom;
     ros::Time reach_time_;
@@ -369,8 +450,11 @@ int main(int argc, char **argv)
     ros::NodeHandle nh("~");
 
     WaypointPublisher wp_pub(nh);
+
+    std::thread th(wp_pub.missionCheckWaypoint);
+    th.detach();
+
     wp_pub.spin();
-    ros::Duration(3.0).sleep();
     ros::shutdown();
     return 0;
 }

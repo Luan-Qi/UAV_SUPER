@@ -16,12 +16,14 @@ Eigen::Matrix4d T_odom_to_map;
 bool has_path = false;
 bool has_pose = false;
 bool has_map_to_odom = false;
+bool new_map_to_odom = false;
 bool need_finished = false;
 bool has_finished = false;
 int current_index = 0;
 bool first_start = false;
 
 double goal_distance_threshold = 0.5; // 到达目标的判定距离
+double repub_distance_threshold = 2.0; // 变换更新时重新发布目标的判定距离
 int path_step = 5; // 每隔几个点发送一次目标
 double publish_rate = 5.0; // Hz
 std::string path_topic, odom_topic, goal_topic, map_to_odom_topic;
@@ -69,7 +71,10 @@ void cbPath(const nav_msgs::Path::ConstPtr& msg)
     has_path = true;
     has_finished = false;
     current_index = path_step;
+
     ROS_INFO("[path_follower_3d] Received new path with %lu points.", msg->poses.size());
+    if (!has_pose || !has_map_to_odom)
+        ROS_INFO("[path_follower_3d] But not get %s%s yet.", has_pose ? "" : "pose,", has_map_to_odom ? "" : "MapToOdom");
 }
 
 void cbOdom(const nav_msgs::Odometry::ConstPtr& msg)
@@ -84,6 +89,7 @@ void cbMapToOdom(const nav_msgs::Odometry::ConstPtr &msg)
     cur_map_to_odom = *msg;
     T_odom_to_map = poseToMatrix(cur_map_to_odom.pose.pose).inverse();
     has_map_to_odom = true;
+    if (!new_map_to_odom) new_map_to_odom = true;
 }
 
 // 工具函数：3D 距离
@@ -93,6 +99,29 @@ double distance3D(const geometry_msgs::PoseStamped& a, const geometry_msgs::Pose
     double dy = a.pose.position.y - b.pose.position.y;
     double dz = a.pose.position.z - b.pose.position.z;
     return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+void publishGoalWithTransform(ros::Publisher& publisher, const geometry_msgs::PoseStamped& goal, const Eigen::Matrix4d& trans)
+{
+    Eigen::Vector3d center(
+        goal.pose.position.x,
+        goal.pose.position.y,
+        goal.pose.position.z);
+    viz_utils::addSphere(marker_array, center, goal_distance_threshold, id++);
+
+    Eigen::Matrix4d T_global = poseToMatrix(goal.pose);
+    Eigen::Matrix4d T_local = trans * T_global;
+    geometry_msgs::PoseStamped current_goal_local;
+    current_goal_local.header = current_goal.header;
+    current_goal_local.pose = matrixToPose(T_local);
+    
+    publisher.publish(current_goal_local);
+
+    ROS_INFO("[path_follower_3d] New goal #%d: (x=%.1f, y=%.1f, z=%.1f)",
+                current_index,
+                current_goal_local.pose.position.x,
+                current_goal_local.pose.position.y,
+                current_goal_local.pose.position.z);
 }
 
 
@@ -131,39 +160,29 @@ int main(int argc, char** argv)
         {
             if (!has_finished)
             {
-                if (distance3D(current_pose, current_goal) < goal_distance_threshold || !first_start)
+                double dist = distance3D(current_pose, current_goal);
+                if (dist < goal_distance_threshold || !first_start)
                 {
                     first_start = true;
 
                     current_goal = local_path.poses[current_index];
+                    publishGoalWithTransform(pub_goal, current_goal, T_odom_to_map);
 
-                    Eigen::Vector3d center(
-                        current_goal.pose.position.x,
-                        current_goal.pose.position.y,
-                        current_goal.pose.position.z);
-                    viz_utils::addSphere(marker_array, center, goal_distance_threshold, id++);
-
-                    Eigen::Matrix4d T_global = poseToMatrix(current_goal.pose);
-                    Eigen::Matrix4d T_local = T_odom_to_map * T_global;
-                    geometry_msgs::PoseStamped current_goal_local;
-                    current_goal_local.header = current_goal.header;
-                    current_goal_local.pose = matrixToPose(T_local);
-                    
-                    pub_goal.publish(current_goal_local);
-
-                    ROS_INFO("[path_follower_3d] New goal #%d: (x=%.1f, y=%.1f, z=%.1f)",
-                             current_index,
-                             current_goal_local.pose.position.x,
-                             current_goal_local.pose.position.y,
-                             current_goal_local.pose.position.z);
-
-                    if (need_finished){has_finished = true;need_finished=false;continue;}
+                    if (need_finished){has_finished = true; need_finished=false; continue;}
                     
                     current_index += path_step;
                     if (current_index >= (int)local_path.poses.size())
                     {
                         current_index = local_path.poses.size() - 1;
                         need_finished = true;
+                    }
+                }
+                else
+                {
+                    if (dist > repub_distance_threshold && new_map_to_odom)
+                    {
+                        publishGoalWithTransform(pub_goal, current_goal, T_odom_to_map);
+                        new_map_to_odom = false;
                     }
                 }
                 pub_marker_array.publish(marker_array);
@@ -178,13 +197,7 @@ int main(int argc, char** argv)
                 first_start = false;
             }
         }
-        // else
-        // {
-        //     ROS_INFO_THROTTLE(5.0, "[path_follower_3d] Waiting for %s%s%s", has_path ? "" : "path,", has_pose ? "" : "pose,", has_map_to_odom ? "" : "T");
-        // }
-
         rate.sleep();
     }
-
     return 0;
 }
