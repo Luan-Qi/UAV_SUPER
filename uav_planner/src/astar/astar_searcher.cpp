@@ -62,6 +62,7 @@ void AstarPathFinder::resetUsedGrids()
         for (int j = 0; j < GLY_SIZE; j++)
             for (int k = 0; k < GLZ_SIZE; k++)
                 resetGrid(GridNodeMap[i][j][k]);
+    terminatePtr = nullptr;
 }
 
 void AstarPathFinder::setObs(const double coord_x, const double coord_y, const double coord_z)
@@ -97,7 +98,7 @@ vector<Vector3d> AstarPathFinder::getVisitedNodes()
                     visited_nodes.push_back(GridNodeMap[i][j][k]->coord);
             }
 
-    ROS_INFO("[astar] visited_nodes size : %d", visited_nodes.size());
+    ROS_INFO("[astar] visited_nodes size : %zu", visited_nodes.size());
     return visited_nodes;
 }
 
@@ -307,7 +308,7 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt)
         {
             ros::Time time_2 = ros::Time::now();
             terminatePtr = currentPtr;
-            ROS_INFO("[astar] [A*]{sucess}  Time in A*  is %.1f ms, path cost is %.1f m", (time_2 - time_1).toSec() * 1000.0,
+            ROS_INFO("[astar] [A*]{sucess} Time in A*  is %.1f ms, path cost is %.1f m", (time_2 - time_1).toSec() * 1000.0,
                     currentPtr->gScore * resolution);
             // cout << "final point" << endl << terminatePtr->coord << endl;
             // cout << "came frome" << endl << terminatePtr->cameFrom->coord << endl;
@@ -382,7 +383,7 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt)
     // if search fails
     ros::Time time_2 = ros::Time::now();
     if ((time_2 - time_1).toSec() > 0.1)
-        ROS_INFO("[astar] Time cost in Astar planner is %.1f", (time_2 - time_1).toSec());
+        ROS_INFO("[astar] [A*]{fail} Time cost in Astar planner is %.1f", (time_2 - time_1).toSec());
 }
 
 vector<Vector3d> AstarPathFinder::getPath()

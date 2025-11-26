@@ -81,13 +81,31 @@
 
 
     <!-- trace global odom to global path -->
-    <node pkg="uav_planner" type="fast_path_follower" name="path_follower" output="screen">
-        <param name="odom_topic" value="$(arg global_Odometry)"/>
-        <param name="goal_distance_threshold" value="1.0"/>
-        <param name="path_step" value="1"/>
-        <param name="publish_rate" value="10.0"/>
-        <param name="lookahead_distance" value="1.0"/>
-    </node>
+    <arg name="use_smoothify" default="true" />
+    <!-- smoothify_path + path_follower -->
+    <group if="$(arg use_smoothify)">
+        <include file="$(find uav_planner)/launch/planner_path_smoothify.launch" />
+        <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
+            <param name="odom_topic" value="$(arg global_Odometry)"/>
+            <param name="path_topic" value="/global_path_smoothed"/>
+            <param name="goal_distance_threshold" value="0.5"/>
+            <param name="path_step" value="6"/>
+            <param name="publish_rate" value="10.0"/>
+            <param name="lookahead_distance" value="1.0"/>
+        </node>
+    </group>
+
+    <!-- simplify_path + fast_path_follower -->
+    <group unless="$(arg use_smoothify)">
+        <include file="$(find uav_planner)/launch/planner_path_simplify.launch" />
+        <node pkg="uav_planner" type="fast_path_follower" name="fast_path_follower" output="screen">
+            <param name="odom_topic" value="$(arg global_Odometry)"/>
+            <param name="path_topic" value="/global_path_raw"/>
+            <param name="goal_distance_threshold" value="1.0"/>
+            <param name="path_step" value="1"/>
+            <param name="publish_rate" value="10.0"/>
+        </node>
+    </group>
 
 
     <!-- local planner main -->

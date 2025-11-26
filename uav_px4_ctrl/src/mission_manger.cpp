@@ -265,7 +265,7 @@ public:
     {
         if (req.takeoff_done)
         {
-            if(current_wp_retry_times_ > 3)
+            if(current_wp_retry_times_ >= 3)
             {
                 ROS_INFO("[mission] Planner has failed! All retries have been used up!");
                 shutdown_requested_ = true;

@@ -26,17 +26,18 @@ public:
         pnh.param<std::string>("output_topic", output_topic_, "path_smoothed");
         pnh.param<double>("step_size", step_size_, 0.05);
         pnh.param<int>("bezier_order", bezier_order_, 2);
+        pnh.param<int>("bezier_radius", bezier_radius_, 2);
         pnh.param<bool>("recaluate_orientation", recaluate_orientation_, true);
 
         sub_path_ = nh.subscribe(input_topic_, 1, &BezierSmoother::pathCallback, this);
         pub_path_ = nh.advertise<nav_msgs::Path>(output_topic_, 1, true);
 
         if (bezier_order_ == 2){
-            ROS_INFO("Quadratic Bezier Smoother initialized.");}
+            ROS_INFO("[smoothify] Quadratic Bezier Smoother initialized.");}
         else if (bezier_order_ == 3){
-            ROS_INFO("Cubic Bezier Smoother initialized.");}
+            ROS_INFO("[smoothify] Cubic Bezier Smoother initialized.");}
         else{
-            ROS_ERROR("Unsupported Bezier order: %d", bezier_order_);
+            ROS_ERROR("[smoothify] Unsupported Bezier order: %d", bezier_order_);
             bezier_order_ = 2;} // 默认为二次贝塞尔
     }
 
@@ -45,6 +46,7 @@ private:
     std::string output_topic_;
     double step_size_;
     int bezier_order_;
+    int bezier_radius_;
     bool recaluate_orientation_;
 
     ros::Subscriber sub_path_;
@@ -123,8 +125,8 @@ private:
             processCubic(raw_poses, smoothed_path);
         
         if(recaluate_orientation_) updateOrientations(smoothed_path);
-        ROS_INFO("Got raw path with %ld points.", msg->poses.size());
-        ROS_INFO("Smoothed path with %ld points.", smoothed_path.poses.size());
+        ROS_INFO("[smoothify] Got raw path with %ld points.", msg->poses.size());
+        ROS_INFO("[smoothify] Smoothed path with %ld points.", smoothed_path.poses.size());
 
         pub_path_.publish(smoothed_path);
     }
@@ -135,11 +137,11 @@ private:
         out_path.poses.push_back(raw_poses[0]); // 起点
 
         size_t n_points = raw_poses.size();
-        for (size_t i = 0; i < n_points - 2; ++i)
+        for (size_t i = 0; i < n_points - 2 * bezier_radius_; i += bezier_radius_)
         {
             Point3D p_curr = toPoint3D(raw_poses[i].pose);
-            Point3D p_next = toPoint3D(raw_poses[i+1].pose);
-            Point3D p_next_next = toPoint3D(raw_poses[i+2].pose);
+            Point3D p_next = toPoint3D(raw_poses[i + 1 * bezier_radius_].pose);
+            Point3D p_next_next = toPoint3D(raw_poses[i + 2 * bezier_radius_].pose);
 
             Point3D start_pt = (i == 0) ? (p_curr + p_next) * 0.5 : (p_curr + p_next) * 0.5;
             Point3D control_pt = p_next;
@@ -170,12 +172,12 @@ private:
         // 现在 points 的大小是 N + 2
         // 我们需要滑动窗口 [i, i+1, i+2, i+3]
         
-        for (size_t i = 0; i < points.size() - 3; ++i)
+        for (size_t i = 0; i < points.size() - 3 * bezier_radius_; i += bezier_radius_)
         {
             Point3D P0 = points[i];
-            Point3D P1 = points[i+1];
-            Point3D P2 = points[i+2];
-            Point3D P3 = points[i+3];
+            Point3D P1 = points[i + 1 * bezier_radius_];
+            Point3D P2 = points[i + 2 * bezier_radius_];
+            Point3D P3 = points[i + 3 * bezier_radius_];
 
             // 将 B-Spline 控制点转换为 Bezier 控制点 (S, C1, C2, E)
             // 这是一个标准的转换公式，保证 C2 连续性

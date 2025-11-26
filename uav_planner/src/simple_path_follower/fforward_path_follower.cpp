@@ -7,6 +7,10 @@
 #include <cmath>
 #include "visual_path_follower.h"
 
+/*
+Forward looking path tracker with feedforward distance calculation
+*/
+
 nav_msgs::Path local_path;
 nav_msgs::Odometry cur_map_to_odom;
 geometry_msgs::PoseStamped current_goal;
@@ -20,6 +24,7 @@ bool has_map_to_odom = false;
 bool need_finished = false;
 bool has_finished = false;
 int current_index = 0;
+bool first_start = false;
 
 double goal_distance_threshold = 0.5; // 到达目标的判定距离
 int path_step = 5; // 每隔几个点发送一次目标
@@ -69,7 +74,7 @@ void cbPath(const nav_msgs::Path::ConstPtr& msg)
     local_path = *msg;
     has_path = true;
     has_finished = false;
-    current_index = 0;
+    current_index = path_step;
     ROS_INFO("[path_follower_3d] Received new path with %lu points.", msg->poses.size());
 }
 
@@ -209,10 +214,11 @@ int main(int argc, char** argv)
             if (!has_finished)
             {
                 //if (distance3D(current_pose, current_goal) < goal_distance_threshold || current_goal.header.seq == 0)
-                if (is_in_sphere() || current_index == 0)
+                if (is_in_sphere() || !first_start)
                 {
-                    current_goal = local_path.poses[current_index];
+                    first_start = true;
 
+                    current_goal = local_path.poses[current_index];
                     if (current_index >= path_step)
                         prev_goal = local_path.poses[current_index - path_step];
                     else
@@ -258,6 +264,7 @@ int main(int argc, char** argv)
                              current_goal_local.pose.position.z);
 
                     if (need_finished){has_finished = true;need_finished=false;continue;}
+                    
                     current_index += path_step;
                     if (current_index >= (int)local_path.poses.size())
                     {
@@ -274,6 +281,7 @@ int main(int argc, char** argv)
                 ROS_INFO("[path_follower_3d] Path finished.");
                 has_path = false;
                 current_index = path_step;
+                first_start = false;
             }
         }
 

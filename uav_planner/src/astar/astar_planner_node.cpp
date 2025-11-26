@@ -169,7 +169,7 @@ int main(int argc, char **argv)
             astar.AstarGraphSearch(start, goal);
             std::vector<Eigen::Vector3d> path_pts = astar.getPath();
 
-            if (path_pts.empty())
+            if (path_pts.size() <= 1)
             {
                 ROS_ERROR("[astar] A* failed to find a path!");
                 have_start = false;
@@ -203,7 +203,7 @@ int main(int argc, char **argv)
             have_goal = false;  // 等待下次规划
             astar.resetUsedGrids();
             ROS_INFO(" ");
-            ROS_INFO("[astar] Waiting for %s%s%s", have_start ? "" : "start_pose,", have_goal ? "" : "goal_pose,", have_octomap ? "" : "octomap");
+            ROS_INFO("[astar] Waiting for next %s%s%s", have_start ? "" : "start_pose,", have_goal ? "" : "goal_pose,", have_octomap ? "" : "octomap");
         }
 
         rate.sleep();

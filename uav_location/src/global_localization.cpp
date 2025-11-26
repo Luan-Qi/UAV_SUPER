@@ -22,6 +22,7 @@
 
 #include <fast_gicp/gicp/fast_gicp.hpp>
 #include <fast_gicp/gicp/fast_vgicp.hpp>
+#define FAST_ICP_ENABLE
 
 #include <tf/transform_datatypes.h>
 #include <tf/LinearMath/Transform.h>
@@ -40,6 +41,10 @@ std::atomic<bool> got_global_map(false);
 std::atomic<bool> got_scan(false);
 std::atomic<bool> initialized(false);
 Eigen::Matrix4f initial;
+
+
+int icp_max_iter = 20;
+
 
 double MAP_VOXEL_SIZE = 0.4;
 double SCAN_VOXEL_SIZE = 0.1;
@@ -103,40 +108,28 @@ std::pair<Eigen::Matrix4f, double> registrationAtScale(const CloudT::Ptr &scan,
     CloudT::Ptr scan_down = voxelDownSample(scan, scan_leaf);
     CloudT::Ptr map_down = voxelDownSample(map, map_leaf);
 
-    // pcl::IterativeClosestPoint<PointT, PointT> icp;
-    // icp.setInputSource(scan_down);
-    // icp.setInputTarget(map_down);
-    // icp.setMaximumIterations(20);
-    // icp.setMaxCorrespondenceDistance(1.0 * scale + 0.001); // tune if needed
-
-    // CloudT aligned;
-    // icp.align(aligned, initial.cast<float>());
-
-    // Eigen::Matrix4f final_tf = icp.getFinalTransformation();
-    // double fitness = icp.hasConverged() ? icp.getFitnessScore() : 1e9; // lower is better for PCL getFitnessScore
-
-    // // NOTE: PCL's getFitnessScore is a distance-based metric (lower better).
-    // // In python code fitness was high-is-better. To mimic threshold semantics we will invert:
-    // // define "pseudo-fitness" = exp(-fitness) so that higher is better, but to keep simple:
-    // // We'll map: pseudo_fitness = 1.0 / (1.0 + fitness)
-    // double pseudo_fitness = 1.0 / (1.0 + fitness);
-
-    // return std::make_pair(final_tf, pseudo_fitness);
-
+#ifndef FAST_ICP_ENABLE
+    pcl::IterativeClosestPoint<PointT, PointT> icp;
+#else
     fast_gicp::FastGICP<PointT, PointT> icp;
-    icp.setNumThreads(4); 
+    icp.setNumThreads(4);
+#endif
+
     icp.setInputSource(scan_down);
     icp.setInputTarget(map_down);
-    icp.setMaximumIterations(20);
-    icp.setMaxCorrespondenceDistance(1.0 * scale + 0.001);
+    icp.setMaximumIterations(icp_max_iter);
+    icp.setMaxCorrespondenceDistance(1.0 * scale + 0.001); // tune if needed
 
     CloudT aligned;
-    icp.align(aligned, initial);
+    icp.align(aligned, initial.cast<float>());
 
     Eigen::Matrix4f final_tf = icp.getFinalTransformation();
-    
-    // fast_gicp 的 fitness 计算方式与 PCL 类似
     double fitness = icp.hasConverged() ? icp.getFitnessScore() : 1e9; // lower is better for PCL getFitnessScore
+
+    // NOTE: PCL's getFitnessScore is a distance-based metric (lower better).
+    // In python code fitness was high-is-better. To mimic threshold semantics we will invert:
+    // define "pseudo-fitness" = exp(-fitness) so that higher is better, but to keep simple:
+    // We'll map: pseudo_fitness = 1.0 / (1.0 + fitness)
     double pseudo_fitness = 1.0 / (1.0 + fitness);
 
     return std::make_pair(final_tf, pseudo_fitness);
@@ -184,6 +177,7 @@ CloudT::Ptr cropGlobalMapInFOV(const CloudT::Ptr &global_map_in,
     return out;
 }
 
+// Crop point cloud by distance in XY plane
 CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud, 
                                      const nav_msgs::Odometry::ConstPtr& center_point, 
                                      double radius) 
@@ -193,12 +187,12 @@ CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud,
     filtered_cloud->is_dense = input_cloud->is_dense;
     
     for (const auto& point : input_cloud->points) {
-        // 计算点到中心的XY平面距离
+        // Calculate distance in XY plane from the point to the center point
         double dx = point.x - center_point->pose.pose.position.x;
         double dy = point.y - center_point->pose.pose.position.y;
         double distance = sqrt(dx * dx + dy * dy);
         
-        // 如果距离在设定半径内，保留该点
+        // Keep the point if it is within the specified radius
         if (distance <= radius) {
             filtered_cloud->points.push_back(point);
         }
@@ -207,6 +201,7 @@ CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud,
     return filtered_cloud;
 }
 
+// Crop point cloud by distance in XY plane with transformation
 CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud, 
                                      const Eigen::Matrix4f &pose_estimation,
                                      const nav_msgs::Odometry::ConstPtr& center_point, 
@@ -218,14 +213,14 @@ CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud,
         
     for (const auto& point : input_cloud->points) 
     {
-        // 按中心点进行半径裁剪
+        // Calculate distance in XY plane from the point to the center point
         double dx = point.x - center_point->pose.pose.position.x;
         double dy = point.y - center_point->pose.pose.position.y;
         double distance = std::sqrt(dx * dx + dy * dy);
 
         if (distance <= radius) 
         {
-            // 将点转为齐次坐标
+            // Transform the point to the new coordinate system using pose estimation matrix
             Eigen::Vector4f pt(point.x, point.y, point.z, 1.0f);
             Eigen::Vector4f pt_transformed = pose_estimation * pt;
 
@@ -282,6 +277,13 @@ bool globalLocalization(Eigen::Matrix4f &T_map_to_odom)
     auto coarse = registrationAtScale(scan_copy, submap, T_map_to_odom, 5.0);
     Eigen::Matrix4f tf_coarse = coarse.first;
     double fitness_coarse = coarse.second;
+
+    if(fitness_coarse < 1e-6)
+    {
+        ROS_WARN("[global] Coarse registration not converged");
+        return false;
+    }
+
     // fine registration (scale=1)
     auto fine = registrationAtScale(scan_copy, submap, tf_coarse, 1.0);
     Eigen::Matrix4f tf_fine = fine.first;
@@ -388,6 +390,7 @@ int main(int argc, char** argv)
     ROS_INFO("[global] Localization Node Inited...");
 
     std::string map_in_topic;
+    nh.param<int>("icp_max_iter", icp_max_iter, 20);
     nh.param<double>("map_voxel_size", MAP_VOXEL_SIZE, MAP_VOXEL_SIZE);
     nh.param<double>("scan_voxel_size", SCAN_VOXEL_SIZE, SCAN_VOXEL_SIZE);
     nh.param<double>("freq_localization", FREQ_LOCALIZATION, FREQ_LOCALIZATION);

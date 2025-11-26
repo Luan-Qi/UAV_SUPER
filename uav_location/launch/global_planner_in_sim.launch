@@ -1,7 +1,7 @@
 <launch>
     <remap from="/Odometry" to="/drone_0_visual_slam/odom"/>
     <remap from="/cloud_registered" to="/drone_0_pcl_render_node/cloud"/>
-    <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor2-1-good_downsampled.pcd"/>
+    <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor2-1-good_downsampled_downsampled.pcd"/>
 
     <arg name="rviz" default="true" />
     
@@ -15,7 +15,7 @@
     <arg name="fov_far" default="5.0" />
     <arg name="map_in_topic" default="/map" />
 
-    <node pkg="uav_locatiation" type="fast_lio_localization" name="fast_lio_localization" output="screen" >
+    <node pkg="uav_location" type="fast_lio_localization" name="fast_lio_localization" output="screen" >
         <param name="map_voxel_size" value="$(arg map_voxel_size)" />
         <param name="scan_voxel_size" value="$(arg scan_voxel_size)" />
         <param name="freq_localization" value="$(arg freq_localization)" />
@@ -34,7 +34,7 @@
     <arg name="init_pitch" default="0.0" />
     <arg name="init_yaw" default="0.0" />
 
-    <node pkg="uav_locatiation" type="publish_initial_pose" name="publish_initial_pose" output="screen" 
+    <node pkg="uav_location" type="publish_initial_pose" name="publish_initial_pose" output="screen" 
         args="$(arg init_x) $(arg init_y) $(arg init_z) $(arg init_roll) $(arg init_pitch) $(arg init_yaw) " />
 
     
@@ -43,7 +43,7 @@
     <arg name="global_locatiation_hz" default="30.0" />
     <param name="takeoff_height" value="0.0" /><!-- set zero when in sim -->
     
-    <node pkg="uav_locatiation" type="transform_fusion" name="transform_fusion" output="screen" >
+    <node pkg="uav_location" type="transform_fusion" name="transform_fusion" output="screen" >
         <param name="global_start_topic" value="$(arg global_start_topic)" />
         <param name="global_locatiation_hz" value="$(arg global_locatiation_hz)" />
     </node>
@@ -71,11 +71,31 @@
     </include>
 
     <!-- trace local odom to local path -->
-    <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
-        <param name="goal_distance_threshold" value="0.4"/>
-        <param name="path_step" value="2"/>
-        <param name="publish_rate" value="5.0"/>
-    </node>
+    <arg name="use_smoothify" default="true" />
+    <!-- smoothify_path + path_follower -->
+    <group if="$(arg use_smoothify)">
+        <include file="$(find uav_planner)/launch/planner_path_smoothify.launch" />
+        <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
+            <param name="odom_topic" value="/Odometry"/>
+            <param name="path_topic" value="/global_path_smoothed"/>
+            <param name="goal_distance_threshold" value="0.5"/>
+            <param name="path_step" value="6"/>
+            <param name="publish_rate" value="10.0"/>
+            <param name="lookahead_distance" value="1.0"/>
+        </node>
+    </group>
+
+    <!-- simplify_path + fast_path_follower -->
+    <group unless="$(arg use_smoothify)">
+        <include file="$(find uav_planner)/launch/planner_path_simplify.launch" />
+        <node pkg="uav_planner" type="fast_path_follower" name="fast_path_follower" output="screen">
+            <param name="odom_topic" value="/Odometry"/>
+            <param name="path_topic" value="/global_path_raw"/>
+            <param name="goal_distance_threshold" value="1.0"/>
+            <param name="path_step" value="1"/>
+            <param name="publish_rate" value="10.0"/>
+        </node>
+    </group>
 
 
     <!-- local planner main -->
@@ -88,11 +108,13 @@
 
 
     <!-- mission manager main -->
-    <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" />
+    <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" >
+        <arg name="waypoints" value="[[52.5, -30.0, 1.0], [0.0, -0.0, 1.0]]"/>
+    </include>
 
 
     <group if="$(arg rviz)">
 	    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz1" 
-              args="-d $(find uav_locatiation)/rviz/global_planner.rviz" />
+              args="-d $(find uav_location)/rviz/global_planner.rviz" />
 	</group>
 </launch>

@@ -24,7 +24,6 @@ bool first_start = false;
 double goal_distance_threshold = 0.5; // 到达目标的判定距离
 int path_step = 5; // 每隔几个点发送一次目标
 double publish_rate = 5.0; // Hz
-double lookahead_dist = 1.2; // 前瞻距离
 std::string path_topic, odom_topic, goal_topic, map_to_odom_topic;
 
 visualization_msgs::MarkerArray marker_array;
@@ -69,7 +68,7 @@ void cbPath(const nav_msgs::Path::ConstPtr& msg)
     local_path = *msg;
     has_path = true;
     has_finished = false;
-    current_index = 1;
+    current_index = path_step;
     ROS_INFO("[path_follower_3d] Received new path with %lu points.", msg->poses.size());
 }
 
@@ -105,9 +104,8 @@ int main(int argc, char** argv)
 
     // 参数读取
     nh.param("goal_distance_threshold", goal_distance_threshold, 0.5);
-    nh.param("path_step", path_step, 5);
+    nh.param("path_step", path_step, 1);
     nh.param("publish_rate", publish_rate, 5.0);
-    nh.param("lookahead_distance", lookahead_dist, 1.2);
     nh.param<std::string>("path_topic", path_topic, "/global_path");
     nh.param<std::string>("odom_topic", odom_topic, "/localization");
     nh.param<std::string>("goal_topic", goal_topic, "/move_base_simple/goal");
@@ -123,7 +121,7 @@ int main(int argc, char** argv)
     ros::Rate rate(publish_rate);
 
     ROS_INFO("[path_follower_3d] Node started. Waiting for /path, /odom, /T...");
-    current_index = 1;
+    current_index = path_step;
 
     while (ros::ok())
     {
@@ -136,7 +134,6 @@ int main(int argc, char** argv)
                 if (distance3D(current_pose, current_goal) < goal_distance_threshold || !first_start)
                 {
                     first_start = true;
-                    if (need_finished){has_finished = true;need_finished=false;continue;}
 
                     current_goal = local_path.poses[current_index];
 
@@ -160,7 +157,9 @@ int main(int argc, char** argv)
                              current_goal_local.pose.position.y,
                              current_goal_local.pose.position.z);
 
-                    current_index++;
+                    if (need_finished){has_finished = true;need_finished=false;continue;}
+                    
+                    current_index += path_step;
                     if (current_index >= (int)local_path.poses.size())
                     {
                         current_index = local_path.poses.size() - 1;
@@ -173,7 +172,7 @@ int main(int argc, char** argv)
             {
                 ROS_INFO("[path_follower_3d] Path finished.");
                 has_path = false;
-                current_index = 1;
+                current_index = path_step;
                 marker_array.markers.clear();
                 id = 0;
                 first_start = false;

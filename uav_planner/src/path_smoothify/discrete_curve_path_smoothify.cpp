@@ -29,7 +29,7 @@ public:
         path_sub_ = nh.subscribe(input_topic_, 1, &PathSmoother3D::pathCallback, this);
         path_pub_ = nh.advertise<nav_msgs::Path>(output_topic_, 1, true);
 
-        ROS_INFO("Discrete Curve Path Smoother initialized.");
+        ROS_INFO("[smoothify] Discrete Curve Path Smoother initialized.");
     }
 
 private:
@@ -54,8 +54,8 @@ private:
         nav_msgs::Path smoothed_path = *msg;
         smoothPath(smoothed_path, msg->poses);
         if(recaluate_orientation_) updateOrientations(smoothed_path);
-        ROS_INFO("Got raw path with %ld points.", msg->poses.size());
-        ROS_INFO("Smoothed path with %ld points.", smoothed_path.poses.size());
+        ROS_INFO("[smoothify] Got raw path with %ld points.", msg->poses.size());
+        ROS_INFO("[smoothify] Smoothed path with %ld points.", smoothed_path.poses.size());
 
         path_pub_.publish(smoothed_path);
     }
