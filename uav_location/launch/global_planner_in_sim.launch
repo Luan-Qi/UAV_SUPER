@@ -39,12 +39,10 @@
 
     
     <!-- global locatization utils for global init pose and pubing global location -->
-    <arg name="global_start_topic" default="/start_pose" />
     <arg name="global_locatiation_hz" default="30.0" />
     <param name="takeoff_height" value="0.0" /><!-- set zero when in sim -->
     
     <node pkg="uav_location" type="transform_fusion" name="transform_fusion" output="screen" >
-        <param name="global_start_topic" value="$(arg global_start_topic)" />
         <param name="global_locatiation_hz" value="$(arg global_locatiation_hz)" />
     </node>
 
@@ -110,7 +108,7 @@
 
     <!-- mission manager main -->
     <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" >
-        <arg name="waypoints" value="[[52.5, -30.0, 1.0], [0.0, -0.0, 1.0]]"/>
+        <arg name="waypoints" value="[[35.0, 0.0, 0.6]*, [52.0, 0.0, 1.0], [52.0, -10.0, 1.0]*, [52.0, -20.0, 0.8]*, [0.0, 0.0, 0.7]]"/>
     </include>
 
 

@@ -23,7 +23,6 @@ bool have_global_start_pose = false;
 std::mutex mtx;
 
 double FREQ_PUB_LOCALIZATION = 30.0;
-double TAKEOFF_HEIGHT = 1.0;
 
 // -------------------- 工具函数：Pose -> Eigen::Matrix4d --------------------
 Eigen::Matrix4d poseToMatrix(const geometry_msgs::Pose &pose)
@@ -116,13 +115,10 @@ void transformFusion()
 
             if(!have_global_start_pose && has_map_to_odom)
             {
-                geometry_msgs::PoseStamped start_pose;
-                start_pose.header.stamp = ros::Time::now();
-                start_pose.header.frame_id = "map";
-                start_pose.pose.position = localization.pose.pose.position;
-                start_pose.pose.position.z += TAKEOFF_HEIGHT;
-                start_pose.pose.orientation = localization.pose.pose.orientation;
-                pub_global_start_pose.publish(start_pose);
+                ROS_INFO("[global] Global localization initialized at (%f, %f, %f)", 
+                         localization.pose.pose.position.x, 
+                         localization.pose.pose.position.y, 
+                         localization.pose.pose.position.z);
                 have_global_start_pose = true;
             }
         }
@@ -137,17 +133,14 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "transform_fusion");
     ros::NodeHandle nh;
 
-    ROS_INFO("[trans_fusion] Transform Fusion Node Inited...");
+    ROS_INFO("[global] Transform Fusion Node Inited...");
 
     std::string global_start_topic;
-    nh.param<std::string>("global_start_topic", global_start_topic, "/start_pose");
     nh.param<double>("global_locatiation_hz", FREQ_PUB_LOCALIZATION, FREQ_PUB_LOCALIZATION);
-    nh.param<double>("/takeoff_height", TAKEOFF_HEIGHT, TAKEOFF_HEIGHT);
 
     ros::Subscriber sub_odom = nh.subscribe("/Odometry", 10, cbOdom);
     ros::Subscriber sub_map_to_odom = nh.subscribe("/map_to_odom", 2, cbMapToOdom);
     pub_localization = nh.advertise<nav_msgs::Odometry>("/localization", 10);
-    pub_global_start_pose = nh.advertise<geometry_msgs::PoseStamped>(global_start_topic, 2);
 
     // 开启独立线程进行融合发布
     std::thread th(transformFusion);

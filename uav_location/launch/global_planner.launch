@@ -39,12 +39,10 @@
 
 
     <!-- global locatization utils for global init pose and pubing global location -->
-    <arg name="global_start_topic" default="/start_pose" />
     <arg name="global_locatiation_hz" default="30.0" />
     <param name="takeoff_height" value="0.6" />
 
     <node pkg="uav_location" type="transform_fusion" name="transform_fusion" output="screen" >
-        <param name="global_start_topic" value="$(arg global_start_topic)" />
         <param name="global_locatiation_hz" value="$(arg global_locatiation_hz)" />
     </node>
 

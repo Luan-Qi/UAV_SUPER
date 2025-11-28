@@ -235,14 +235,25 @@ int main(int argc, char** argv)
                         current_goal.pose.position.y,
                         current_goal.pose.position.z
                     );
+                    
+                    Eigen::Vector3d P_end(
+                        local_path.poses.back().pose.position.x,
+                        local_path.poses.back().pose.position.y,
+                        local_path.poses.back().pose.position.z
+                    );
 
                     Eigen::Vector3d dir = P_cur - P_prev;
                     if (dir.norm() > 1e-3)
                         dir.normalize();
                     else
                         dir = Eigen::Vector3d(0,0,0);
-
-                    Eigen::Vector3d P_lookahead = P_cur + dir * lookahead_dist;
+                    
+                    Eigen::Vector3d P_lookahead;
+                    double dist_to_end = (P_end - P_cur).norm();
+                    if (dist_to_end < lookahead_dist)
+                        P_lookahead = P_cur + dir * lookahead_dist;
+                    else
+                        P_lookahead = P_end;
 
                     geometry_msgs::PoseStamped lookahead_goal = current_goal;
                     lookahead_goal.pose.position.x = P_lookahead.x();
