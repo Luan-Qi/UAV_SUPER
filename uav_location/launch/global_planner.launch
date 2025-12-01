@@ -119,6 +119,7 @@
         <arg name="waypoints" value="[[52.0, -0.5, 1.0]*, [37.0, -0.0, 0.6]*]"/>
     </include>
     
+    <!-- px4 controller main -->
     <include file="$(find uav_px4_ctrl)/launch/px4ctrl.launch" />
 
     <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz_planner" 

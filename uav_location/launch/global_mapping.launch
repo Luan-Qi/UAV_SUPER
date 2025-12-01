@@ -1,15 +1,16 @@
 <launch>
-    <arg name="use_sim_time" default="true" />
+    <arg name="use_sim_time" default="false" />
     <param name="/use_sim_time" value="$(arg use_sim_time)" />
-    <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/scan.pcd"/>
     
-    <include file="$(find mavros)/launch/px4.launch">
+    <include file="$(find mavros)/launch/px4.launch" />
 
-    <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch">
+    <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch"/>
 
     <include file="$(find fast_lio)/launch/mapping_mid360.launch" >
         <arg name="rviz" value="true" />
     </include>
+
+    <include file="$(find uav_px4_ctrl)/launch/px4ctrl.launch" />
 
     <group if="$(arg use_sim_time)">
 	    <node name="playbag" pkg="rosbag" type="play" args="--clock /mnt/nvme/rosbag/float2.bag -r 1 -s 66" />

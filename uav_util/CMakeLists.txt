@@ -13,7 +13,11 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   roscpp
   sensor_msgs
+  cv_bridge
+  image_transport
 )
+
+find_package(OpenCV REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -120,6 +124,7 @@ catkin_package(
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -159,6 +164,10 @@ add_dependencies(merge_cloud_node ${catkin_EXPORTED_TARGETS})
 add_executable(pcd_downsample_node src/pcd_downsample_node.cpp)
 target_link_libraries(pcd_downsample_node ${catkin_LIBRARIES})
 add_dependencies(pcd_downsample_node ${catkin_EXPORTED_TARGETS})
+
+add_executable(simple_camera_driver src/simple_camera_driver.cpp)
+target_link_libraries(simple_camera_driver ${catkin_LIBRARIES})
+add_dependencies(simple_camera_driver ${catkin_EXPORTED_TARGETS} ${OpenCV_LIBRARIES})
 
 #############
 ## Install ##

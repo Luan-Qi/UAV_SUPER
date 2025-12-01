@@ -1,0 +1,18 @@
+<launch>
+    <arg name="device_id" default="0" />
+    <arg name="width" default="1280" />
+    <arg name="height" default="720" />
+    <arg name="fps" default="30" />
+    
+    <arg name="mjpeg" default="true" />
+
+    <node pkg="uav_util" type="simple_camera_driver" name="my_webcam" output="screen">
+        <param name="video_device_id" value="$(arg device_id)" />
+        <param name="image_width" value="$(arg width)" />
+        <param name="image_height" value="$(arg height)" />
+        <param name="framerate" value="$(arg fps)" />
+        <param name="use_mjpeg" value="$(arg mjpeg)" />
+        
+        <param name="camera_frame_id" value="camera_optical_frame" />
+    </node>
+</launch>
