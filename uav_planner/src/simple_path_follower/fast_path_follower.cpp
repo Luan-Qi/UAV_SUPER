@@ -177,14 +177,14 @@ int main(int argc, char** argv)
                         need_finished = true;
                     }
                 }
-                else
-                {
-                    if (dist > repub_distance_threshold && new_map_to_odom)
-                    {
-                        publishGoalWithTransform(pub_goal, current_goal, T_odom_to_map);
-                        new_map_to_odom = false;
-                    }
-                }
+                // else
+                // {
+                //     if (dist > repub_distance_threshold && new_map_to_odom)
+                //     {
+                //         publishGoalWithTransform(pub_goal, current_goal, T_odom_to_map);
+                //         new_map_to_odom = false;
+                //     }
+                // }
                 pub_marker_array.publish(marker_array);
             }
             else

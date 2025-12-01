@@ -250,7 +250,7 @@ int main(int argc, char** argv)
                     
                     Eigen::Vector3d P_lookahead;
                     double dist_to_end = (P_end - P_cur).norm();
-                    if (dist_to_end < lookahead_dist)
+                    if (dist_to_end > lookahead_dist)
                         P_lookahead = P_cur + dir * lookahead_dist;
                     else
                         P_lookahead = P_end;
