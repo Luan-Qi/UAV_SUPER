@@ -10,7 +10,9 @@ find_package(catkin REQUIRED COMPONENTS
     sensor_msgs
     std_msgs
     geometry_msgs
+    mavros_msgs
     dynamic_reconfigure
+    tf2
 )
 
 find_package(OpenCV REQUIRED)
@@ -34,4 +36,7 @@ include_directories(
 add_subdirectory(include/uav_tracker)
 add_executable(KCFTracker_node src/KCF_Tracker.cpp)
 target_link_libraries(KCFTracker_node kcftracker ${OpenCV_LIBRARIES} ${OpenCV_LIBS} ${catkin_LIBRARIES})
+
+add_executable(KCFTracker_control_node src/KCF_Tracker_control.cpp)
+target_link_libraries(KCFTracker_control_node ${catkin_LIBRARIES})
 

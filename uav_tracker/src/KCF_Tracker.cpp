@@ -43,6 +43,10 @@ ImageConverter::ImageConverter(ros::NodeHandle &n)
     // Subscrive to input video feed and publish output video feed
     image_sub_ = n.subscribe("/camera/color/image_raw", 1, &ImageConverter::imageCb, this);
     depth_sub_ = n.subscribe("/camera/depth/image_raw", 1, &ImageConverter::depthCb, this);
+
+    target_pub_ = n.advertise<geometry_msgs::Point>("/tracker/target_position", 1);
+    status_pub_ = n.advertise<std_msgs::Bool>("/tracker/is_tracking", 1);
+    
     namedWindow(RGB_WINDOW);
     namedWindow(DEPTH_WINDOW);
 }
@@ -100,6 +104,9 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr &msg)
         enable_get_depth = false;
     }
 
+    std_msgs::Bool is_tracking_msg;
+    geometry_msgs::Point target_pos_msg;
+
     if (bBeginKCF)
     {
         enable_get_depth = true;
@@ -132,7 +139,36 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr &msg)
                 Scalar(0, 255, 0), 1, 8);
         putText(rgbimage, text_z.c_str(), Point(center_x + 10, center_y + 23), FONT_HERSHEY_SIMPLEX, 0.5,
                 Scalar(255, 0, 0), 1, 8);
-    } else rectangle(rgbimage, selectRect, Scalar(0, 0, 255), 2, 8, 0);
+        
+        // 计算相对于图像中心的偏差
+        float error_x = (float)center_x - (rgbimage.cols / 2.0);
+        float error_y = (float)center_y - (rgbimage.rows / 2.0);
+        
+        target_pos_msg.x = error_x;   // 像素误差
+        target_pos_msg.y = error_y;   // 像素误差
+        target_pos_msg.z = minDist;   // 深度距离 (m)
+
+        // 简单的可信度检查：如果深度无限远或为0，可能丢失
+        if(minDist > 0.1 && minDist < 10.0) {
+            is_tracking_msg.data = true;
+        } else {
+            is_tracking_msg.data = false; // 深度异常视为丢失
+        }
+    }
+    else
+    {
+        rectangle(rgbimage, selectRect, Scalar(0, 0, 255), 2, 8, 0);
+
+        is_tracking_msg.data = false;
+        target_pos_msg.x = 0;
+        target_pos_msg.y = 0;
+        target_pos_msg.z = 0;
+    }
+
+    status_pub_.publish(is_tracking_msg);
+    if(is_tracking_msg.data) {
+        target_pub_.publish(target_pos_msg);
+    }
 
     imshow(RGB_WINDOW, rgbimage);
     int action = waitKey(1) & 0xFF;

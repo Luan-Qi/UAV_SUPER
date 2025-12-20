@@ -58,7 +58,7 @@ private:
     ros::Subscriber target_sub_;
     ros::Subscriber status_sub_;
     ros::Subscriber state_sub_;
-    ros::Subscriber pose_sub_; // 新增：订阅姿态
+    ros::Subscriber pose_sub_;
     ros::Publisher vel_pub_;
 
     mavros_msgs::State current_state_;
@@ -90,13 +90,14 @@ public:
         // 参数加载
         ros::NodeHandle private_nh("~");
         private_nh.param("mode", control_mode_, 0); // 默认为0 (原地模式)
-        private_nh.param("desired_distance", desired_distance_, 2.0f);
+        private_nh.param("desired_distance", desired_distance_, 1.0f);
         private_nh.param("camera_mount_pitch", camera_mount_pitch_deg_, 0.0f); 
 
         state_sub_ = nh_.subscribe<mavros_msgs::State>("mavros/state", 10, &DroneController::stateCb, this);
         status_sub_ = nh_.subscribe<std_msgs::Bool>("/tracker/is_tracking", 1, &DroneController::statusCb, this);
         target_sub_ = nh_.subscribe<geometry_msgs::Point>("/tracker/target_position", 1, &DroneController::targetCb, this);
-        pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &DroneController::poseCb, this);
+        if(control_mode_ == MODE_FOLLOW)
+            pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &DroneController::poseCb, this);
         
         vel_pub_ = nh_.advertise<geometry_msgs::Twist>("/mavros/setpoint_velocity/cmd_vel_unstamped", 1);
 
@@ -109,7 +110,6 @@ public:
         current_state_ = *msg;
     }
 
-    // 新增：姿态回调，用于获取当前飞机的倾斜角
     void poseCb(const geometry_msgs::PoseStamped::ConstPtr& msg) {
         current_pose_ = *msg;
         tf2::Quaternion q(
@@ -140,16 +140,17 @@ public:
         float dt = (current_time - last_time_).toSec();
         last_time_ = current_time;
 
-        if (dt <= 0 || dt > 1.0) return; // 过滤异常时间差
+        if (dt <= 0 || dt > 1.0) // 过滤异常时间差
+        {
+            ROS_WARN("Invalid dt: %.2f", dt);
+            return;
+        }
 
         geometry_msgs::Twist vel_msg;
 
         // 1. 安全检查
-        if (current_state_.mode != "OFFBOARD" || !is_tracking_) {
-            // 不发送任何指令，或者发送0指令
-            vel_pub_.publish(vel_msg); // default is 0
-            return;
-        }
+        if (current_state_.mode != "OFFBOARD" || !is_tracking_)
+            return; // 不发送任何指令
 
         // 2. 坐标系转换与补偿 (关键步骤)
         // 我们的目标是将“视觉误差”转换成“水平坐标系下的物理误差”

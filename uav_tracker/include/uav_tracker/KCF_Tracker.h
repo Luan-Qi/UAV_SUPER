@@ -13,6 +13,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 #include "geometry_msgs/Twist.h"
+#include "geometry_msgs/Point.h"
+#include <std_msgs/Bool.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include "kcftracker.h"
@@ -29,6 +31,8 @@ public:
     ros::NodeHandle n;
     ros::Subscriber image_sub_;
     ros::Subscriber depth_sub_;
+    ros::Publisher target_pub_;
+    ros::Publisher status_pub_;
     const char *RGB_WINDOW = "rgb_img";
     const char *DEPTH_WINDOW = "depth_img";
     bool enable_get_depth = false;
