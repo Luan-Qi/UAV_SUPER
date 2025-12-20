@@ -1,11 +1,11 @@
 <launch>
-    <arg name="planner_type" default="dp" />
+    <arg name="planner_type" default="greedy" />
 
     <node name="dp_path_simplify" pkg="uav_planner" type="dp_path_simplify" output="screen"
           if="$(eval arg('planner_type') == 'dp')">
         <param name="input_topic" value="/global_path_raw"/>
         <param name="output_topic" value="/global_path"/>
-        <param name="simplification_threshold" value="0.25"/>
+        <param name="simplification_threshold" value="0.45"/>
         <param name="min_segment_length" value="0.5"/>
     </node>
 

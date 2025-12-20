@@ -1,0 +1,5 @@
+<launch>
+    <include file="$(find orbbec_camera)/launch/gemini_330_series.launch"/>
+    <!-- 距离相机的范围【0.3米，8米】，否则无效-->
+    <node name="KCF_Tracker" pkg="uav_tracker" type="KCFTracker_node" required="true" output="screen"/>
+</launch>
