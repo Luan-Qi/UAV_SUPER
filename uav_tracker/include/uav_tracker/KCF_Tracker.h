@@ -21,6 +21,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <time.h>
 #include <iomanip>
+#include <cmath>
 
 using namespace std;
 using namespace cv;
@@ -33,6 +34,11 @@ public:
     ros::Subscriber depth_sub_;
     ros::Publisher target_pub_;
     ros::Publisher status_pub_;
+
+    float LIMIT_MAX_DIST;
+    float LIMIT_MIN_DIST;
+    bool SHOW_DEPTH_WINDOW = false;
+
     const char *RGB_WINDOW = "rgb_img";
     const char *DEPTH_WINDOW = "depth_img";
     bool enable_get_depth = false;

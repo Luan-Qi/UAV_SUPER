@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 import os
 import time
@@ -33,7 +33,7 @@ class Astra_Tracker:
         self.tracker_types = ['BOOSTING', 'MIL', 'KCF', 'TLD', 'MEDIANFLOW', 'MOSSE', 'CSRT', 'color']
         self.tracker_type = rospy.get_param("~tracker_type", 'color')
         self.user_name = getpass.getuser()
-        text_path = '/home/' + self.user_name + '/orbbec_ws/src/astra_tracker/scripts'
+        text_path = '/home/' + self.user_name + '/Desktop/UAV-Super/src/uav_tracker/script'
         self.hsv_text = text_path + "/AstraTrackerHSV.text"
 
         Server(AstraColorHSVConfig, self.dynamic_reconfigure_callback)
@@ -135,7 +135,7 @@ if __name__ == '__main__':
     '''
     astra_tracker = Astra_Tracker()
 
-    capture = cv.VideoCapture(6)
+    capture = cv.VideoCapture(0)
     cv_edition = cv.__version__
     if cv_edition[0] == '3': capture.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc(*'XVID'))
     else: capture.set(cv.CAP_PROP_FOURCC, cv.VideoWriter.fourcc('M', 'J', 'P', 'G'))

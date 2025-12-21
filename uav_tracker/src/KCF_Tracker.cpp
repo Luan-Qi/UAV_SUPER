@@ -46,9 +46,13 @@ ImageConverter::ImageConverter(ros::NodeHandle &n)
 
     target_pub_ = n.advertise<geometry_msgs::Point>("/tracker/target_position", 1);
     status_pub_ = n.advertise<std_msgs::Bool>("/tracker/is_tracking", 1);
+
+    n.param("limit_max_dist", LIMIT_MAX_DIST, 10.0f);
+    n.param("limit_max_dist", LIMIT_MIN_DIST, 0.3f);
+    n.param("show_depth_window", SHOW_DEPTH_WINDOW, false); 
     
     namedWindow(RGB_WINDOW);
-    namedWindow(DEPTH_WINDOW);
+    if(SHOW_DEPTH_WINDOW) namedWindow(DEPTH_WINDOW);
 }
 
 ImageConverter::~ImageConverter()
@@ -59,7 +63,7 @@ ImageConverter::~ImageConverter()
     delete RGB_WINDOW;
     delete DEPTH_WINDOW;
     destroyWindow(RGB_WINDOW);
-    destroyWindow(DEPTH_WINDOW);
+    if(SHOW_DEPTH_WINDOW) destroyWindow(DEPTH_WINDOW);
 }
 
 void ImageConverter::Reset() {
@@ -149,11 +153,10 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr &msg)
         target_pos_msg.z = minDist;   // 深度距离 (m)
 
         // 简单的可信度检查：如果深度无限远或为0，可能丢失
-        if(minDist > 0.1 && minDist < 10.0) {
+        if(minDist != std::numeric_limits<double>::quiet_NaN() && minDist != std::numeric_limits<double>::infinity())
             is_tracking_msg.data = true;
-        } else {
+        else
             is_tracking_msg.data = false; // 深度异常视为丢失
-        }
     }
     else
     {
@@ -203,15 +206,20 @@ void ImageConverter::depthCb(const sensor_msgs::ImageConstPtr &msg)
         int num_depth_points = 5;
         for (int i = 0; i < 5; i++)
         {
-            if (dist_val[i] > 0.3 && dist_val[i] < 10.0) minDist += dist_val[i];
+            if (dist_val[i] > LIMIT_MIN_DIST && dist_val[i] < LIMIT_MAX_DIST) minDist += dist_val[i];
             else num_depth_points--;
         }
         minDist /= num_depth_points;
     }
-    Mat depthimage_uint8;
-    normalize(depthimage, depthimage_uint8, 0, 255, NORM_MINMAX);
-    convertScaleAbs(depthimage_uint8, depthimage_uint8);
-    imshow(DEPTH_WINDOW, depthimage_uint8);
+
+    if(SHOW_DEPTH_WINDOW)
+    {
+        Mat depthimage_uint8;
+        normalize(depthimage, depthimage_uint8, 0, 255, NORM_MINMAX);
+        convertScaleAbs(depthimage_uint8, depthimage_uint8);
+        imshow(DEPTH_WINDOW, depthimage_uint8);
+    }
+
     waitKey(1);
 }
 
@@ -225,12 +233,12 @@ void ImageConverter::Cancel()
     image_sub_.shutdown();
     depth_sub_.shutdown();
     destroyWindow(RGB_WINDOW);
-    destroyWindow(DEPTH_WINDOW);
+    if(SHOW_DEPTH_WINDOW) destroyWindow(DEPTH_WINDOW);
 }
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "KCF_Tracker");
-    ros::NodeHandle nh;
+    ros::NodeHandle nh("~");
     ImageConverter imageConverter(nh);
     ros::spin();
     return 0;

@@ -21,7 +21,8 @@
 // 定义控制模式
 enum ControlMode {
     MODE_FIXED_POS = 0, // 原地不动，只转Yaw
-    MODE_FOLLOW = 1     // 移动跟随
+    MODE_FOLLOW = 1,    // 移动跟随
+    MODE_FOLLOW_NO_YAW = 2 // 移动跟随，但不转Yaw
 };
 
 class PID {
@@ -76,6 +77,7 @@ private:
     int control_mode_;       // 0: Fixed, 1: Follow
     float desired_distance_; // 期望距离 (m)
     float camera_mount_pitch_deg_; // 摄像头安装角度 (向下为正，例如45度)
+    bool debug_mode_;
 
     // 状态变量
     double current_roll_, current_pitch_, current_yaw_;
@@ -83,8 +85,8 @@ private:
 public:
     DroneController() : 
         // PID 参数需要根据实际飞行调试 [Kp, Ki, Kd, Limit]
-        pid_dist(1.0, 0.01, 0.1, 1.5),    // 距离PID (输出m/s)
-        pid_h(1.0, 0.0, 0.05, 1.0),       // 高度PID (输出m/s)
+        pid_dist(0.6, 0.005, 0.05, 1.0),    // 距离PID (输出m/s)
+        pid_h(0.002, 0.0, 0.0002, 0.5),       // 高度PID (输出m/s)
         pid_yaw(0.003, 0.0, 0.0001, 0.8)  // 偏航PID (输入是像素，输出rad/s)
     {
         // 参数加载
@@ -92,6 +94,7 @@ public:
         private_nh.param("mode", control_mode_, 0); // 默认为0 (原地模式)
         private_nh.param("desired_distance", desired_distance_, 1.0f);
         private_nh.param("camera_mount_pitch", camera_mount_pitch_deg_, 0.0f); 
+        private_nh.param("debug_mode", debug_mode_, true); 
 
         state_sub_ = nh_.subscribe<mavros_msgs::State>("mavros/state", 10, &DroneController::stateCb, this);
         status_sub_ = nh_.subscribe<std_msgs::Bool>("/tracker/is_tracking", 1, &DroneController::statusCb, this);
@@ -148,106 +151,68 @@ public:
 
         geometry_msgs::Twist vel_msg;
 
-        // 1. 安全检查
-        if (current_state_.mode != "OFFBOARD" || !is_tracking_)
-            return; // 不发送任何指令
-
-        // 2. 坐标系转换与补偿 (关键步骤)
-        // 我们的目标是将“视觉误差”转换成“水平坐标系下的物理误差”
+        if ((current_state_.mode != "OFFBOARD" && !debug_mode_) || !is_tracking_)
+            return;
         
-        // 2.1 提取视觉原始数据
         // KCF输出: x(水平像素误差), y(垂直像素误差), z(深度距离)
         float pixel_err_x = target_pos_.x; // >0 表示目标在画面右侧
         float pixel_err_y = target_pos_.y; // >0 表示目标在画面下方
         float depth = target_pos_.z;       // 目标距离相机的直线距离
 
-        // 2.2 计算相机安装角度 + 无人机当前姿态的总俯仰角
-        // 注意：MAVROS中，Pitch向上为正。但通常摄像头是向下安装。
-        // 假设 camera_mount_pitch_deg_ 是向下倾斜的角度 (如 45度)
-        // 实际总倾角(相对于水平面向下) = Camera_Mount - Drone_Pitch
-        // 如果飞机抬头(Pitch>0)，摄像头看的角度会变高(变平)
+        // 计算相机安装角度 + 无人机当前姿态的总俯仰角
         double total_pitch_rad = (camera_mount_pitch_deg_ * M_PI / 180.0) - current_pitch_;
-
-        // 2.3 分解距离 (几何矫正)
-        // 我们不直接用深度做控制，因为深度混合了水平距离和垂直高度
-        // Horizontal_Dist = Depth * cos(total_pitch)
-        // Vertical_Dist = Depth * sin(total_pitch)
-        // *注意*: 这里的Vertical_Dist是相对于摄像头的垂直分量。
-        // 但更精确的控制方法是：修正“目标在画面中心的垂直误差”造成的虚假高度变化。
         
         // 简化模型：
         // 假设像素误差对应角度误差。这里简单用像素值做PID输入，但在输出层做旋转补偿。
-        
-        // --- 控制逻辑开始 ---
+        //但更精确的控制方法是：修正“目标在画面中心的垂直误差”造成的虚假高度变化。
 
-        // A. 偏航控制 (Yaw) - 两种模式通用
-        // 目标在右边(pixel_err_x > 0) -> 无人机向右转 (Angular Z < 0)
-        // 注意：MAVROS坐标系下，Z轴朝上，逆时针为正。
-        // 如果目标在右边，我们需要顺时针转(负值)。
+        // 偏航控制 (Yaw)
         float cmd_yaw_rate = pid_yaw.compute(-pixel_err_x, dt);
 
-        // B. 计算用于调试或模式2的线性速度
         float cmd_vel_x = 0;
         float cmd_vel_z = 0;
         float cmd_vel_y = 0;
 
-        // 计算水平距离误差 (用于保持距离)
-        // 简单近似：如果摄像头大概水平，error = depth - desired.
-        // 如果摄像头倾斜，我们需要保持的是“水平投影距离”还是“直线距离”？通常保持直线距离比较简单有效。
+        // 计算直线距离
         float dist_error = depth - desired_distance_;
         
-        // 原始PID输出 (在相机坐标系下的意图)
         // 相机前向速度 (用于接近/远离)
         float v_cam_forward = pid_dist.compute(dist_error, dt); 
         // 相机垂直速度 (用于修正画面上下偏差)
-        // 目标在下方(pixel_err_y > 0) -> 需要向下飞 -> Body Z 减少
         float v_cam_vertical = pid_h.compute(-pixel_err_y, dt);
 
-        // C. 速度分解与姿态补偿 (仅在 FOLLOW 模式下应用)
-        // 将相机坐标系的速度意图，转换到水平机体坐标系 (Horizontal Frame)
-        // 这样即使飞机低头加速，也不会错误地改变高度
-        
-        // 旋转矩阵: 将 [v_forward, v_vertical] 旋转 total_pitch_rad
-        // v_body_x (水平前向) = v_forward * cos(theta) - v_vertical * sin(theta)
-        // v_body_z (垂直向上) = v_forward * sin(theta) + v_vertical * cos(theta)
-        // *注意符号*: v_vertical 在这里定义为“向上为正”的修正量。
-        // 上面计算 v_cam_vertical 时，如果目标在下方，结果为负。
-        
-        // 重新明确 v_cam_vertical 的物理意义：
-        // 它是为了让目标回到画面垂直中心所需的速度。
-        // 如果目标在画面下方(y>0)，我们需要向下飞，所以 PID 输出负值。
-        
-        // 修正后的分解公式：
+        // 速度分解与姿态补偿 (仅在 FOLLOW 模式下应用)
         float v_body_x = v_cam_forward * cos(total_pitch_rad) - v_cam_vertical * sin(total_pitch_rad);
         float v_body_z = v_cam_forward * sin(total_pitch_rad) + v_cam_vertical * cos(total_pitch_rad);
 
-        if (control_mode_ == MODE_FOLLOW) {
+        if (control_mode_ == MODE_FOLLOW)
+        {
             cmd_vel_x = v_body_x;
             cmd_vel_z = v_body_z;
-            // cmd_vel_y (横移) 通常设为0，我们主要靠转头(Yaw)来对准中心
-            // 如果希望飞机平移而不是转头，可以将 pid_yaw 的输出给到 cmd_vel_y
             cmd_vel_y = 0; 
-        } else {
-            // MODE_FIXED_POS
-            // 即使在定点模式，我们也计算了 cmd_vel_z 和 x，但如果不赋值给消息，就不会执行
-            // 用户要求：摄像头上下角度无法控制，但保留控制输出。
-            // 这里的 "保留输出" 可以理解为在 Log 中打印，或者发布到 debug 话题
-            // 实际发给飞控的速度为0
-            cmd_vel_x = 0;
-            cmd_vel_y = 0;
-            cmd_vel_z = 0;
-            
-            // 可以在此处 ROS_INFO 打印 v_cam_vertical 查看如果能动会怎么动
-            // ROS_INFO_THROTTLE(1, "Virtual Tilt Output: %.2f", v_cam_vertical);
+        }
+        else if (control_mode_ == MODE_FOLLOW_NO_YAW)
+        {
+            cmd_vel_x = v_body_x;
+            cmd_vel_z = v_body_z;
+            cmd_vel_y = cmd_yaw_rate;
+            cmd_yaw_rate = 0;
         }
 
-        // 3. 发布指令
-        vel_msg.linear.x = cmd_vel_x;
-        vel_msg.linear.y = cmd_vel_y;
-        vel_msg.linear.z = cmd_vel_z;
-        vel_msg.angular.z = cmd_yaw_rate;
+        if (debug_mode_)
+        {
+            ROS_INFO_THROTTLE(1, "V_CAM: (|:%.2f, -:%.2f)", v_cam_vertical, v_cam_forward);
+            ROS_INFO_THROTTLE(1, "CMD_VEL: (x:%.2f, y:%.2f, z:%.2f, yaw:%.2f)", cmd_vel_x, cmd_vel_y, cmd_vel_z, cmd_yaw_rate);
+        }
+        else
+        {
+            vel_msg.linear.x = cmd_vel_x;
+            vel_msg.linear.y = cmd_vel_y;
+            vel_msg.linear.z = cmd_vel_z;
+            vel_msg.angular.z = cmd_yaw_rate;
 
-        vel_pub_.publish(vel_msg);
+            vel_pub_.publish(vel_msg);
+        }
     }
 };
 
