@@ -1,24 +1,29 @@
 <launch>
-    <node pkg="uav_px4_ctrl" type="waypoint_publisher" name="waypoint_publisher" output="screen" >
-        <!-- 输入话题（odom 优先） -->
-        <param name="odom_topic" value="/drone_0_visual_slam/odom" />
-        <param name="pose_topic" value="/mavros/local_position/pose" />
-        <param name="goal_topic" value="/goal_pose" />
+    <include file="$(find ego_planner)/launch/single_run_in_exp.launch" />
+    <include file="$(find fast_lio)/launch/mapping_mid360.launch" />
 
-        <!-- 到达阈值 -->
-        <param name="distance_threshold" value="1.0" />
-
-        <!-- 到达后等待时间 -->
-        <param name="wait_time" value="5.0" />
-
-        <!-- 启动延迟时间 -->
-        <param name="start_delay" value="3.0" />
-
-        <!-- 位置话题超时时间（秒） -->
-        <param name="topic_timeout" value="2.0" />
-
-        <!-- 路径点 -->
-        <param name="waypoints" value="[[0, 0, 4.0], [-33.0, 0, 1.0], [-33.0, -44.5, 4.0], [0, 0, 1.0]]"/>
+    <!-- 输入话题（odom 优先） -->
+    <arg name="odom_topic" default="/Odometry"/>
+    <arg name="pose_topic" default="/mavros/local_position/pose"/>
+    <arg name="goal_topic" default="/move_base_simple/goal"/>
+    <arg name="distance_threshold" default="0.3"/>
+    <arg name="wait_time" default="1.0"/>
+    <arg name="start_delay" default="3.0"/>
+    <arg name="topic_timeout" default="2.0"/>
+    <arg name="mission_cycle" default="true"/>
+    <arg name="waypoints" default="[[2, 0, 0.5], [2, -2, 0.5], [0, -2, 0.5], [0, 0, 0.5]]"/>
+    <node pkg="uav_px4_ctrl" type="mission_manger" name="mission_manger" output="screen">
+        <param name="odom_topic" value="$(arg odom_topic)"/>
+        <param name="pose_topic" value="$(arg pose_topic)"/>
+        <param name="goal_topic" value="$(arg goal_topic)"/>
+        <param name="distance_threshold" value="$(arg distance_threshold)"/>
+        <param name="wait_time" value="$(arg wait_time)"/>
+        <param name="start_delay" value="$(arg start_delay)"/>
+        <param name="topic_timeout" value="$(arg topic_timeout)"/>
+        <param name="mission_cycle" value="$(arg mission_cycle)"/>
+        <param name="waypoints" value="$(arg waypoints)"/>
     </node>
+
+    <include file="$(find uav_px4_ctrl)/launch/px4ctrl.launch" />
 </launch>
 

@@ -156,19 +156,26 @@ include_directories(
 #   ${catkin_LIBRARIES}
 # )
 
-add_executable(px4_takeoff src/px4_takeoff.cpp)
+
+add_executable(odometry_to_px4_node src/odometry_to_px4.cpp)
+target_link_libraries(odometry_to_px4_node
+  ${catkin_LIBRARIES}
+)
+add_dependencies(odometry_to_px4_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(px4_takeoff src/px4_pos_takeoff.cpp)
 target_link_libraries(px4_takeoff
   ${catkin_LIBRARIES}
 )
 add_dependencies(px4_takeoff ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(px4_rectangle src/px4_rectangle.cpp)
+add_executable(px4_rectangle src/px4_pos_rectangle.cpp)
 target_link_libraries(px4_rectangle
   ${catkin_LIBRARIES}
 )
 add_dependencies(px4_rectangle ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(px4_up-and-down src/px4_up-and-down.cpp)
+add_executable(px4_up-and-down src/px4_pos_up-and-down.cpp)
 target_link_libraries(px4_up-and-down
   ${catkin_LIBRARIES}
 )

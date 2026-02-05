@@ -1,0 +1,104 @@
+<launch>
+
+    <!-- ===================== 基本选择 ===================== -->
+
+    <!-- 地图类型：cube / sphere / box_corridor / cylinder_corridor -->
+    <arg name="shape_type" default="cylinder_corridor"/>
+    <!-- 点云类型：xyz / xyzi / xyzrgb -->
+    <arg name="point_type" default="xyzi" />   
+
+    <!-- PCD 文件输出路径 -->
+    <arg name="pcd_output_path"
+        default="$(env HOME)/generated_map.pcd"/>
+
+    <!-- ===================== 通用参数 ===================== -->
+
+    <!-- 点云分辨率（所有形状通用） -->
+    <arg name="resolution" default="0.05"/>
+
+    <!-- 壳体厚度（所有封闭体通用） -->
+    <arg name="thickness" default="0.1"/>
+    <arg name="publish_cloud" default="true"/>
+
+    <!-- ===================== 尺寸参数 ===================== -->
+    <!-- 立方体 / 长方体走廊 -->
+    <arg name="length" default="180.0"/>
+    <arg name="width"  default="50.0"/>
+    <arg name="height" default="6.0"/>
+
+    <!-- 球体 / 圆柱走廊 -->
+    <arg name="radius" default="3.0"/>
+
+    <!-- 坐标系原点 -->
+    <arg name="center_x" default="0.0"/>
+    <arg name="center_y" default="0.0"/>
+    <arg name="center_z" default="2.5"/>
+
+    <!-- 点云整体姿态（单位：rad） -->
+    <arg name="roll"  default="0.0" />
+    <arg name="pitch" default="0.0" />
+    <arg name="yaw"   default="0.0" />
+
+    <!-- ===================== 噪声参数 ========== -->
+    <!-- 噪声标准差 -->
+    <arg name="enable_noise" default="false"/>
+    <arg name="noise_std" default="0.02"/>
+
+    <!-- 稀疏点 -->
+    <arg name="enable_sparse" default="false"/>
+    <arg name="sparse_keep_ratio" default="0.6"/>
+
+    <!-- 孔洞 -->
+    <arg name="enable_hole" default="false"/>
+    <arg name="hole_x" default="10.0"/>
+    <arg name="hole_y" default="0.0"/>
+    <arg name="hole_z" default="0.0"/>
+    <arg name="hole_radius" default="1.5"/>
+
+    <!-- ===================== 节点 ===================== -->
+
+    <node pkg="uav_util"
+          type="pcd_map_generator_node"
+          name="pcd_map_generator"
+          output="screen">
+
+        <!-- 类型选择 -->
+        <param name="shape_type" value="$(arg shape_type)"/>
+        <param name="point_type" value="$(arg point_type)"/>
+
+        <!-- PCD 输出 -->
+        <param name="pcd_output_path" value="$(arg pcd_output_path)"/>
+
+        <!-- 通用参数 -->
+        <param name="resolution" value="$(arg resolution)"/>
+        <param name="thickness" value="$(arg thickness)"/>
+        <param name="publish_cloud" value="$(arg publish_cloud)"/>
+
+        <!-- 尺寸参数（不用的在代码里会被忽略） -->
+        <param name="length" value="$(arg length)"/>
+        <param name="width"  value="$(arg width)"/>
+        <param name="height" value="$(arg height)"/>
+        <param name="radius" value="$(arg radius)"/>
+
+        <!-- 坐标系旋转与原点 -->
+        <param name="center_x" value="$(arg center_x)"/>
+        <param name="center_y" value="$(arg center_y)"/>
+        <param name="center_z" value="$(arg center_z)"/>
+        <param name="roll" value="$(arg roll)"/>
+        <param name="pitch" value="$(arg pitch)"/>
+        <param name="yaw" value="$(arg yaw)"/>
+
+        <!-- 噪声参数 -->
+        <param name="enable_noise" value="$(arg enable_noise)"/>
+        <param name="noise_std" value="$(arg noise_std)"/>
+        <param name="enable_sparse" value="$(arg enable_sparse)"/>
+        <param name="sparse_keep_ratio" value="$(arg sparse_keep_ratio)"/>
+        <param name="enable_hole" value="$(arg enable_hole)"/>
+        <param name="hole_x" value="$(arg hole_x)"/>
+        <param name="hole_y" value="$(arg hole_y)"/>
+        <param name="hole_z" value="$(arg hole_z)"/>
+        <param name="hole_radius" value="$(arg hole_radius)"/>
+
+    </node>
+
+</launch>

@@ -74,3 +74,6 @@ add_dependencies(dc_path_smoothify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_
 add_executable(bezier_path_smoothify src/path_smoothify/bezier_path_smoothify.cpp)
 target_link_libraries(bezier_path_smoothify ${catkin_LIBRARIES})
 add_dependencies(bezier_path_smoothify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(pca_direction_node src/slp_planner/pca_direction_node.cpp)
+target_link_libraries(pca_direction_node ${catkin_LIBRARIES})

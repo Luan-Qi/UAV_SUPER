@@ -169,6 +169,10 @@ add_executable(simple_camera_driver src/simple_camera_driver.cpp)
 target_link_libraries(simple_camera_driver ${catkin_LIBRARIES})
 add_dependencies(simple_camera_driver ${catkin_EXPORTED_TARGETS} ${OpenCV_LIBRARIES})
 
+add_executable(pcd_map_generator_node src/generate_pcd_map.cpp)
+target_link_libraries(pcd_map_generator_node ${catkin_LIBRARIES})
+add_dependencies(pcd_map_generator_node ${catkin_EXPORTED_TARGETS} ${OpenCV_LIBRARIES})
+
 #############
 ## Install ##
 #############
