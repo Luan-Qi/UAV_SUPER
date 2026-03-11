@@ -20,8 +20,12 @@
     <arg name="thickness" default="0.1"/>
     <arg name="publish_cloud" default="true"/>
 
+    <!-- 点云特殊参数 -->
+    <arg name="intensity_dir" default="x"/>
+    <arg name="point_color" default=""/>
+
     <!-- ===================== 尺寸参数 ===================== -->
-    <!-- 立方体 / 长方体走廊 -->
+    <!-- 立方体 / 长方体走廊 (XYZ) -->
     <arg name="length" default="180.0"/>
     <arg name="width"  default="50.0"/>
     <arg name="height" default="6.0"/>
@@ -30,22 +34,22 @@
     <arg name="radius" default="3.0"/>
 
     <!-- 坐标系原点 -->
-    <arg name="center_x" default="0.0"/>
+    <arg name="center_x" default="-5.0"/>
     <arg name="center_y" default="0.0"/>
-    <arg name="center_z" default="2.5"/>
+    <arg name="center_z" default="3.0"/>
 
-    <!-- 点云整体姿态（单位：rad） -->
+    <!-- 点云整体姿态（单位：rad）（先旋转，再平移） -->
     <arg name="roll"  default="0.0" />
     <arg name="pitch" default="0.0" />
     <arg name="yaw"   default="0.0" />
 
-    <!-- ===================== 噪声参数 ========== -->
+    <!-- ===================== 噪声参数 ===================== -->
     <!-- 噪声标准差 -->
-    <arg name="enable_noise" default="false"/>
-    <arg name="noise_std" default="0.02"/>
+    <arg name="enable_noise" default="true"/>
+    <arg name="noise_std" default="0.01"/>
 
     <!-- 稀疏点 -->
-    <arg name="enable_sparse" default="false"/>
+    <arg name="enable_sparse" default="true"/>
     <arg name="sparse_keep_ratio" default="0.6"/>
 
     <!-- 孔洞 -->

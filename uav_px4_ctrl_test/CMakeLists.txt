@@ -123,7 +123,7 @@ catkin_package(
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
-  ${CMAKE_SOURCE_DIR}/uav_px4_ctrl/src
+  ${CMAKE_SOURCE_DIR}/uav_px4_ctrl/src/px4ctrl
 )
 
 ## Declare a C++ library
@@ -181,7 +181,7 @@ target_link_libraries(px4_up-and-down
 )
 add_dependencies(px4_up-and-down ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(px4_vel_simple_test src/px4_vel_simple_test.cpp ../uav_px4_ctrl/src/subscribe.cpp)
+add_executable(px4_vel_simple_test src/px4_vel_simple_test.cpp ../uav_px4_ctrl/src/px4ctrl/subscribe.cpp)
 target_link_libraries(px4_vel_simple_test
   ${catkin_LIBRARIES}
 )

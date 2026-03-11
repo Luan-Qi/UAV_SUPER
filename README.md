@@ -2,13 +2,61 @@
 Self summarized and prepared for UAV auto drive system
 
 
-source code commit
-1.(livox_ros_driver2): Take the lidar extrinsics into account when processing IMU data
-2.(egoplanner):  Unlock egoplanner z limmit at z=1.0
-3.(fast_lio): Use faslio lidar input No.4 for normal cloudpoint (XYZI)
+#### 部分组件修改说明：  
+1.(livox_ros_driver2): Take the lidar extrinsics into account when processing IMU data.  
+2.(egoplanner):  Unlock egoplanner z limmit at z=1.0.  
+3.(livox_ros_driver2): fix driver's output data type (<arg name="output_type" default="0"/>).  
+4.(fast_lio): Use faslio lidar input No.4 for normal cloudpoint (XYZI).  
 
+## 基础功能
+### 硬件驱动
+*使用飞行和建图模式之前请先打开驱动，并确保驱动正常运行*
+* 连接PX4飞控
+* 启动双目相机驱动
+* 启动MID360雷达驱动
+```
+bash ./shfile/uav_super_interfance.sh
+```
+或者
+```
+roslaunch mavros px4.launch & sleep 4;
+roslaunch orbbec_camera gemini_330_series.launch & sleep 3;
+roslaunch livox_ros_driver2 msg_MID360.launch & sleep 2;
+```
 
+### 手动飞行建图模式
+启动之后无人机可以使用定点模式完成悬停，使用RC控制器手动控制飞行，完成飞行后手动降落关闭节点即可得到地图。**及时修改文件名以免覆盖**
+```
+bash ./shfile/uav_super_mapping.sh
+```
+或者
+```
+roslaunch uav_location global_mapping.launch & sleep 2;
 
+echo "starting camera and wainting 10 seconds...";
+roslaunch uav_util simple_camera.launch  & sleep 10;
+
+echo "start recording...";
+rosbag record -O /mnt/nvme/rosbag/scans.bag /livox/imu /livox/lidar /simple_camera/image_compressed
+```
+
+### 仿真自主飞行模式
+提前在launch文件中设置好目标点的位置、停留时间、录像控制等参数。
+启动节点之后，等待无人机完成重定位，如果无法立即完成请手动晃动无人机。
+无人机完成定位之后，手动切换到Offboard模式，并且切换自动飞行按钮到高位，等待RC主动解锁，然后无人机开始自动飞行。
+**发生意外需要及时手动控制**。
+```
+roslaunch uav_location global_planner_in_sim.launch;
+```
+
+### 自动飞行模式
+```
+bash ./shfile/uav_super_main.sh
+```
+或者
+```
+roslaunch uav_location global_planner.launch;
+```
 
 ## 目录结构
 ```
