@@ -1,7 +1,7 @@
 <launch>
     <remap from="/Odometry" to="/drone_0_visual_slam/odom"/>
     <remap from="/cloud_registered" to="/drone_0_pcl_render_node/cloud"/>
-    <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/guqiaokuang-1_downsampled.pcd"/>
+    <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor1-1-good_downsampled_downsampled.pcd"/>
 
     <arg name="rviz" default="true" />
     
@@ -53,7 +53,7 @@
     </include>
 
 
-    <!-- local planner main -->
+    <!-- global planner main -->
     <arg name="octomap_topic" default="/octomap_full" />
     <arg name="start_pose_topic" default="/start_pose" />
     <arg name="goal_pose_topic" default="/goal_pose" />
@@ -69,32 +69,14 @@
     </include>
 
 
-    <!-- trace local odom to local path -->
-    <arg name="use_smoothify" default="true" />
-    <!-- smoothify_path + path_follower -->
-    <group if="$(arg use_smoothify)">
-        <include file="$(find uav_planner)/launch/planner_path_smoothify.launch" />
-        <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
-            <param name="odom_topic" value="/Odometry"/>
-            <param name="path_topic" value="/global_path_smoothed"/>
-            <param name="goal_distance_threshold" value="0.5"/>
-            <param name="path_step" value="6"/>
-            <param name="publish_rate" value="10.0"/>
-            <param name="lookahead_distance" value="1.0"/>
-        </node>
-    </group>
-
-    <!-- simplify_path + fast_path_follower -->
-    <group unless="$(arg use_smoothify)">
-        <include file="$(find uav_planner)/launch/planner_path_simplify.launch" />
-        <node pkg="uav_planner" type="fast_path_follower" name="fast_path_follower" output="screen">
-            <param name="odom_topic" value="/Odometry"/>
-            <param name="path_topic" value="/global_path_raw"/>
-            <param name="goal_distance_threshold" value="1.0"/>
-            <param name="path_step" value="1"/>
-            <param name="publish_rate" value="10.0"/>
-        </node>
-    </group>
+    <!-- global planner path downsample -->
+    <node pkg="uav_planner" type="path_downsampler" name="path_downsampler">
+        <param name="input_topic" value="/global_path_raw"/>
+        <param name="output_topic" value="/global_path"/>
+        <param name="mode" value="step"/>
+        <param name="step" value="10"/>
+        <param name="distance_thresh" value="2.0"/>
+    </node>
 
 
     <!-- local planner main -->
@@ -108,7 +90,7 @@
 
     <!-- mission manager main -->
     <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" >
-        <arg name="waypoints" value="[[35.0, 0.0, 0.6]*, [52.0, 0.0, 1.0], [52.0, -10.0, 1.0]*, [52.0, -20.0, 0.8]*, [0.0, 0.0, 0.7]]"/>
+        <arg name="waypoints" value="[[52.0, -12.0, 1.0]*, [0.0, 0.0, 0.8]]"/>
     </include>
 
 

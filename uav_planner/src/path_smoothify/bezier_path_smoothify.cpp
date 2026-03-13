@@ -22,12 +22,12 @@ public:
         ros::NodeHandle pnh("~");
 
         // 参数获取
-        pnh.param<std::string>("input_topic", input_topic_, "path_raw");
-        pnh.param<std::string>("output_topic", output_topic_, "path_smoothed");
-        pnh.param<double>("step_size", step_size_, 0.05);
-        pnh.param<int>("bezier_order", bezier_order_, 2);
-        pnh.param<int>("bezier_radius", bezier_radius_, 2);
-        pnh.param<bool>("recaluate_orientation", recaluate_orientation_, true);
+        pnh.param<std::string>("input_topic", input_topic_, "path_raw");        // 输入路径
+        pnh.param<std::string>("output_topic", output_topic_, "path_smoothed"); // 输出路径
+        pnh.param<double>("step_size", step_size_, 0.05);                       // 步长，控制贝塞尔切分粒度
+        pnh.param<int>("bezier_order", bezier_order_, 2);                       // 贝塞尔阶数，2或3
+        pnh.param<int>("bezier_radius", bezier_radius_, 2);                     // 贝塞尔半径，控制贝塞尔切分粒度
+        pnh.param<bool>("recaluate_orientation", recaluate_orientation_, true); // 是否重新计算路径朝向
 
         sub_path_ = nh.subscribe(input_topic_, 1, &BezierSmoother::pathCallback, this);
         pub_path_ = nh.advertise<nav_msgs::Path>(output_topic_, 1, true);

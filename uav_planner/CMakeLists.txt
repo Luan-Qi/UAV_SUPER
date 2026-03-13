@@ -40,6 +40,7 @@ include_directories(
   ${EIGEN3_INCLUDE_DIRS}
 )
 
+# uav_planner
 add_executable(astar_planner_node src/astar/astar_planner_node.cpp src/astar/astar_searcher.cpp src/astar/astar_visualization.cpp)
 target_link_libraries(astar_planner_node ${catkin_LIBRARIES})
 add_dependencies(astar_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
@@ -49,6 +50,7 @@ target_link_libraries(transform_path ${catkin_LIBRARIES})
 add_dependencies(transform_path ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 
+# path_follower
 add_executable(path_follower src/simple_path_follower/fforward_path_follower.cpp src/simple_path_follower/visual_path_follower.cpp)
 target_link_libraries(path_follower ${catkin_LIBRARIES})
 add_dependencies(path_follower ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
@@ -57,6 +59,11 @@ add_executable(fast_path_follower src/simple_path_follower/fast_path_follower.cp
 target_link_libraries(fast_path_follower ${catkin_LIBRARIES})
 add_dependencies(fast_path_follower ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+
+# path_simplifier
+add_executable(path_downsampler src/path_simplify/path_downsampling.cpp)
+target_link_libraries(path_downsampler ${catkin_LIBRARIES})
+add_dependencies(path_downsampler ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_executable(dp_path_simplify src/path_simplify/DP_path_simplify.cpp)
 target_link_libraries(dp_path_simplify ${catkin_LIBRARIES})
@@ -67,6 +74,7 @@ target_link_libraries(greedy_path_simplify ${catkin_LIBRARIES})
 add_dependencies(greedy_path_simplify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 
+# path_smoothifier
 add_executable(dc_path_smoothify src/path_smoothify/discrete_curve_path_smoothify.cpp)
 target_link_libraries(dc_path_smoothify ${catkin_LIBRARIES})
 add_dependencies(dc_path_smoothify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
@@ -75,5 +83,7 @@ add_executable(bezier_path_smoothify src/path_smoothify/bezier_path_smoothify.cp
 target_link_libraries(bezier_path_smoothify ${catkin_LIBRARIES})
 add_dependencies(bezier_path_smoothify ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+
+# slp_planner
 add_executable(pca_direction_node src/slp_planner/pca_direction_node.cpp)
 target_link_libraries(pca_direction_node ${catkin_LIBRARIES})
