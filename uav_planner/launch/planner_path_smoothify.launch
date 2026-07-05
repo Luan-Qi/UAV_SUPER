@@ -1,23 +1,51 @@
+<!--
+ ============================================================================
+ planner_path_smoothify.launch — 路径平滑节点启动文件
+
+ 功能:
+   对 A* 规划器输出的路径 (/global_path_raw) 进行平滑处理, 使路径更适于飞行控制,
+   输出平滑后的路径 (/global_path_smoothed)。
+
+ 可选算法:
+   - bezier (默认): 贝塞尔曲线平滑
+     支持二次贝塞尔 (C1 连续, 紧贴路径) 和三次贝塞尔 (C2 连续, 极度平滑)
+     通过插值生成新的路径点, 路径点数会增加
+
+   - dc: 离散曲线平滑 (Discrete Curve Smoothing)
+     迭代优化原始路径点位置, 路径点数不变
+     通过权重平衡数据保真度与平滑度
+
+ 使用示例:
+   # 贝塞尔平滑 (推荐, 飞行平顺)
+   roslaunch uav_planner planner_path_smoothify.launch planner_type:=bezier
+
+   # 离散曲线平滑 (保持点数不变)
+   roslaunch uav_planner planner_path_smoothify.launch planner_type:=dc
+ ============================================================================
+-->
 <launch>
+    <!-- 平滑算法选择: "bezier" (贝塞尔曲线) | "dc" (离散曲线迭代平滑) -->
     <arg name="planner_type" default="bezier" />
 
+    <!-- ====== 离散曲线平滑 (迭代加权平均) ====== -->
     <node name="dc_path_smoothify" pkg="uav_planner" type="dc_path_smoothify" output="screen"
           if="$(eval arg('planner_type') == 'dc')">
-        <param name="input_topic" value="/global_path_raw"/>
-        <param name="output_topic" value="/global_path_smoothed"/>
-        <param name="weight_data" value="0.45"/>
-        <param name="weight_smooth" value="0.4"/>
-        <param name="tolerance" value="0.0001"/>
-        <param name="recaluate_orientation" value="true" />
+        <param name="input_topic"            value="/global_path_raw"/>        <!-- 输入: 原始路径 -->
+        <param name="output_topic"           value="/global_path_smoothed"/>   <!-- 输出: 平滑后路径 -->
+        <param name="weight_data"            value="0.45"/>                    <!-- 数据项权重: 拉向原始点 -->
+        <param name="weight_smooth"          value="0.4"/>                     <!-- 平滑项权重: 拉向邻居均值 -->
+        <param name="tolerance"              value="0.0001"/>                  <!-- 收敛阈值: 累计变化 < 此值时停止 -->
+        <param name="recaluate_orientation"  value="true" />                   <!-- 是否重算路径朝向 (yaw/pitch) -->
     </node>
 
+    <!-- ====== 贝塞尔曲线平滑 ====== -->
     <node name="bezier_path_smoothify" pkg="uav_planner" type="bezier_path_smoothify" output="screen"
           if="$(eval arg('planner_type') == 'bezier')">
-        <param name="input_topic" value="/global_path_raw" />
-        <param name="output_topic" value="/global_path_smoothed" />
-        <param name="bezier_order" value="3" />
-        <param name="bezier_radius" value="4" />
-        <param name="step_size" value="0.5" />
-        <param name="recaluate_orientation" value="true" />
+        <param name="input_topic"            value="/global_path_raw" />       <!-- 输入: 原始路径 -->
+        <param name="output_topic"           value="/global_path_smoothed" />  <!-- 输出: 平滑后路径 -->
+        <param name="bezier_order"           value="3" />                      <!-- 贝塞尔阶数: 2=C1连续 3=C2连续 -->
+        <param name="bezier_radius"          value="4" />                      <!-- 控制点采样步长: 越大越平滑 -->
+        <param name="step_size"              value="0.5" />                    <!-- t 参数步长: 越小插值越密 -->
+        <param name="recaluate_orientation"  value="true" />                   <!-- 是否重算路径朝向 (yaw/pitch) -->
     </node>
 </launch>

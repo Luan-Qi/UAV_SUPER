@@ -1,10 +1,50 @@
 <?xml version="1.0"?>
+
+<!--
+    @file uav_super.urdf
+    @brief UAV Super 机器人 URDF 模型描述文件。
+
+    @details
+    该 URDF 文件定义了 UAV Super 机体的坐标变换树 (TF tree)，
+    包含以下关键连杆及其固定关节：
+
+    TF 变换树结构：
+    @code
+    base_link (基座原点)
+    ├── livox_frame  (IMU 坐标系，偏移 0,0,0)
+    ├── lidar_link   (LiDAR 坐标系，偏移 0,0,0)
+    └── camera_init  (视觉里程计原点帧，偏移 0,0,0)
+    @endcode
+
+    所有连杆通过 fixed 类型关节连接到 base_link，当前配置下
+    偏移量均为零（传感器刚性安装在同一位置），可根据实际安装
+    位置调整 <origin> 的 xyz 和 rpy 参数。
+
+    @section frames 坐标帧说明
+    - base_link    : 无人机基座参考系，所有传感器的父帧。
+    - livox_frame  : Livox Mid-360 内置 IMU 的坐标系。
+    - lidar_link   : LiDAR 点云数据发布的参考坐标系（/livox/lidar_cloud 的 frame_id）。
+    - camera_init  : 视觉/里程计初始化坐标系，Cartographer 将其作为 odom_frame。
+
+    @note 如果传感器安装位置发生变化，请修改对应 joint 的 <origin> 标签。
+    @note 该 URDF 由 robot_state_publisher 加载并发布 TF 变换。
+
+    @author 鸾棋
+    @date   2025
+-->
 <robot name="uav_livox_tf" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
     <!-- ======================= base_link ======================= -->
+    <!--
+        @brief 无人机基座连杆，所有传感器的根参考系。
+    -->
     <link name="base_link"/>
 
     <!-- ======================= IMU Link ========================= -->
+    <!--
+        @brief Livox Mid-360 内置 IMU 连杆。
+        @details 通过固定关节 base_to_imu 连接到 base_link。
+    -->
     <link name="livox_frame"/>
     <joint name="base_to_imu" type="fixed">
         <parent link="base_link"/>
@@ -13,6 +53,10 @@
     </joint>
 
     <!-- ======================= Lidar Link ======================= -->
+    <!--
+        @brief LiDAR 连杆，点云数据发布的 frame_id。
+        @details 通过固定关节 base_to_lidar 连接到 base_link。
+    -->
     <link name="lidar_link"/>
     <joint name="base_to_lidar" type="fixed">
         <parent link="base_link"/>
@@ -21,6 +65,12 @@
     </joint>
 
     <!-- ======================= Camera Link (可选) =============== -->
+    <!--
+        @brief 视觉/里程计坐标系连杆（可选）。
+        @details 通过固定关节 base_to_camera 连接到 base_link。
+                  该帧在 Cartographer 中用作 odom_frame，
+                  表示里程计的初始坐标系。
+    -->
     <link name="camera_init"/>
     <joint name="base_to_camera" type="fixed">
         <parent link="base_link"/>

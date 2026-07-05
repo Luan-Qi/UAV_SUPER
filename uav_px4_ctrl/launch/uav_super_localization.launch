@@ -1,37 +1,64 @@
 <launch>
-    <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor2-1-good_downsampled.pcd"/>
-    <arg name="global_Odometry" default="/global_Odometry"/>
-    <arg name="rviz" default="true" />
+    <!-- uav_super_localization — 全自主飞行系统总启动文件（定位 + 地图 + 规划 + 控制） -->
+    <!--
+      功能：一键启动完整 UAS 自主飞行管线：
+        1. 全局定位 (uav_localization: fast_lio + icp localization)
+        2. TF→Odometry 桥接 (convert_tf_to_odom.py)
+        3. 局部里程计 (fast_lio: mapping)
+        4. 全局地图发布 (uav_planner: octomap_publisher)
+        5. 全局规划 (uav_planner: astar_planner)
+        6. 路径跟随 (uav_planner: path_follower)
+        7. 局部规划 (ego_planner: single_run_in_exp)
+        8. 任务管理 (mission_manger)
+      依赖：Livox Mid-360 激光雷达, PX4 飞控, MAVROS
+      用法：roslaunch uav_px4_ctrl uav_super_localization.launch pcd_file:=/path/to/map.pcd
 
-    <param name="takeoff_height" value="0.6" />
+      系统架构：
+        LiDAR → fast_lio → /Odometry ─┬─→ px4ctrl → PX4
+                                      ├─→ localization → /global_Odometry
+                                      │       └─→ path_follower → ego_planner
+                                      └─→ octomap_publisher → astar_planner
+                                                                    │
+        mission_manger ←── /goal_pose ←────────── astar_planner ←──┘
+    -->
 
-    <!-- global localization -->
+    <!-- ===== 地图与话题配置 ===== -->
+    <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor2-1-good_downsampled.pcd"/>  <!-- 全局点云地图路径 -->
+    <arg name="global_Odometry" default="/global_Odometry"/>  <!-- 全局里程计话题 -->
+    <arg name="rviz" default="true" />  <!-- 是否启动 RViz -->
+
+    <!-- ===== 起飞高度 ===== -->
+    <param name="takeoff_height" value="0.6" />  <!-- 起飞高度 [m] -->
+
+    <!-- ===== [1/7] 全局定位 ===== -->
+    <!-- 基于 fast_lio 的局部里程计 + ICP 全局定位 -->
     <include file="$(find uav_localization)/launch/localization_mid360.launch" >
         <arg name="use_bag" default="false" />
         <arg name="rviz" default="false" />
     </include>
 
+    <!-- ===== [2/7] TF → Odometry 桥接 ===== -->
+    <!-- 将 TF 变换转换为 nav_msgs/Odometry 消息供规划器使用 -->
     <node pkg="uav_px4_ctrl" type="convert_tf_to_odom.py" name="convert_tf_to_odom" output="screen"/>
 
-
-    <!-- local Odometry for px4 flight controller -->
+    <!-- ===== [3/7] 局部里程计（供 PX4 飞控） ===== -->
+    <!-- fast_lio 实时激光里程计 -->
     <include file="$(find fast_lio)/launch/mapping_mid360.launch" >
         <arg name="rviz" value="false" />
     </include>
 
-
-    <!-- global map for global planner -->
+    <!-- ===== [4/7] 全局地图发布（供全局规划器） ===== -->
+    <!-- 从 PCD 文件加载点云地图并发布为 octomap -->
     <include file="$(find uav_planner)/launch/octomap_publisher.launch" >
         <arg name="pcd_file" value="$(arg pcd_file)"/>
     </include>
 
-
-    <!-- global planner main -->
-    <arg name="octomap_topic" default="/octomap_full" />
-    <arg name="start_pose_topic" default="/start_pose" />
-    <arg name="goal_pose_topic" default="/goal_pose" />
-    <arg name="enable_obstacle_show" default="true" />
-    <arg name="inflater_size" default="2" />
+    <!-- ===== [5/7] 全局规划器 ===== -->
+    <arg name="octomap_topic" default="/octomap_full" />         <!-- OctoMap 话题 -->
+    <arg name="start_pose_topic" default="/start_pose" />        <!-- 起始位姿话题 -->
+    <arg name="goal_pose_topic" default="/goal_pose" />          <!-- 目标位姿话题 -->
+    <arg name="enable_obstacle_show" default="true" />           <!-- 是否显示障碍物 -->
+    <arg name="inflater_size" default="2" />                     <!-- 障碍物膨胀尺寸 [体素] -->
 
     <include file="$(find uav_planner)/launch/astar_planner.launch" >
         <arg name="octomap_topic" value="$(arg octomap_topic)" />
@@ -41,28 +68,28 @@
         <arg name="inflater_size" value="$(arg inflater_size)" />
     </include>
 
-
-    <!-- trace global odom to global path -->
+    <!-- ===== [6/7] 路径跟随器（全局路径 → 局部目标序列） ===== -->
+    <!-- 根据全局里程计将 A* 路径转化为 path_follower 指令 -->
     <node pkg="uav_planner" type="path_follower" name="path_follower" output="screen">
-        <param name="goal_distance_threshold" value="0.3"/>
-        <param name="path_step" value="2"/>
-        <param name="publish_rate" value="5.0"/>
-        <param name="odom_topic" value="$(arg global_Odometry)"/>
+        <param name="goal_distance_threshold" value="0.3"/>  <!-- 目标到达阈值 [m] -->
+        <param name="path_step" value="2"/>                   <!-- 路径点步长 [个] -->
+        <param name="publish_rate" value="5.0"/>              <!-- 发布频率 [Hz] -->
+        <param name="odom_topic" value="$(arg global_Odometry)"/>  <!-- 全局里程计话题 -->
     </node>
 
-    <!-- local planner main -->
+    <!-- ===== [7/7] 局部规划器 ===== -->
+    <!-- EGO-Planner: 局部避障轨迹规划 -->
     <include file="$(find ego_planner)/launch/single_run_in_exp.launch" />
 
-
-    <!-- mission manager main -->
+    <!-- ===== 任务管理器 ===== -->
     <include file="$(find uav_px4_ctrl)/launch/mission_manger.launch" >
         <arg name="odom_topic" value="$(arg global_Odometry)"/>
         <arg name="waypoints" value="[[52.0, -10.0, 0.6], [52.0, -0.0, 0.6]]"/>
     </include>
-    
 
+    <!-- ===== RViz 可视化 ===== -->
     <group if="$(arg rviz)">
-	    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz_planner" 
+        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz_planner"
               args="-d $(find uav_px4_ctrl)/rviz/demo_3d.rviz" />
-	</group>
+    </group>
 </launch>

@@ -1,25 +1,45 @@
 <launch>
-    <!-- velocity control or position control -->
-    <arg name="control_mode" default="position" />
-    <arg name="battery_limit" default="17.4" />
+    <!-- px4ctrl_node — PX4 无人机主控制节点 -->
+    <!--
+      功能：MAVROS offboard 控制中间层，负责坐标修正、多模式控制、安全门限与状态机。
+      依赖：MAVROS (state/imu/battery/rc), 里程计 (Odometry), 外部轨迹指令 (PositionCommand)
+      用法：roslaunch uav_px4_ctrl px4ctrl.launch control_mode:=velocity
 
-    <!-- position control parameters -->
-    <arg name="position_max_x" value="100.0" />
-    <arg name="position_min_x" value="-100.0" />
-    <arg name="position_max_y" value="100.0" />
-    <arg name="position_min_y" value="-100.0" />
-    <arg name="position_max_z" value="5.0" />
-    <arg name="position_min_z" value="-1.0" />
-    <arg name="position_max_vel" value="6.0" />
-    <arg name="position_max_acc" value="6.0" />
+      系统架构/数据流：
+        RC遥控器 ──→ /mavros/rc/in ──→ rc_data (arm/mode/gear 状态机)
+        轨迹规划器 ──→ /position_cmd ──→ cmd_data (目标位姿/速度)
+        里程计 ────→ /Odometry ────→ odom_data (坐标修正后转发 PX4 vision_pose)
+        px4ctrl ────→ /mavros/vision_pose/pose  (视觉位姿输入)
+                ────→ /mavros/setpoint_position/local (位置指令)
+                ────→ /mavros/setpoint_velocity/cmd_vel (速度指令)
+                ────→ /takeoff_notify (起飞完成通知)
+    -->
 
-    <!-- velocity control parameters -->
-    <arg name="cmd_vel_max_x" value="0.5" />
-    <arg name="cmd_vel_max_y" value="0.5" />
-    <arg name="cmd_vel_max_z" value="0.5" />
-    <arg name="cmd_vel_max_acc" value="5.0" />
-    <arg name="cmd_vel_max_jerk" value="5.0" />
+    <!-- ===== 控制模式 ===== -->
+    <arg name="control_mode" default="position" />     <!-- position | velocity | attitude -->
+    <arg name="battery_limit" default="17.4" />         <!-- 电池低电压阈值 [V] -->
 
+    <!-- ===== 位置控制安全边界 ===== -->
+    <arg name="position_max_x" value="100.0" />    <!-- 最大 X 边界 [m] -->
+    <arg name="position_min_x" value="-100.0" />   <!-- 最小 X 边界 [m] -->
+    <arg name="position_max_y" value="100.0" />    <!-- 最大 Y 边界 [m] -->
+    <arg name="position_min_y" value="-100.0" />   <!-- 最小 Y 边界 [m] -->
+    <arg name="position_max_z" value="5.0" />      <!-- 最大 Z 边界 [m] -->
+    <arg name="position_min_z" value="-1.0" />     <!-- 最小 Z 边界 [m] -->
+    <arg name="position_max_vel" value="6.0" />    <!-- 位置变化最大速率 [m/s] -->
+    <arg name="position_max_acc" value="6.0" />    <!-- 位置变化最大加速度 [m/s²] -->
+
+    <!-- ===== 里程计话题 ===== -->
+    <arg name="odom_topic" default="/Odometry" />  <!-- 里程计话题名 -->
+
+    <!-- ===== 速度控制限幅 ===== -->
+    <arg name="cmd_vel_max_x" value="0.5" />       <!-- 最大 X 线速度 [m/s] -->
+    <arg name="cmd_vel_max_y" value="0.5" />       <!-- 最大 Y 线速度 [m/s] -->
+    <arg name="cmd_vel_max_z" value="0.5" />       <!-- 最大 Z 线速度 [m/s] -->
+    <arg name="cmd_vel_max_acc" value="5.0" />     <!-- 最大加速度 [m/s²] -->
+    <arg name="cmd_vel_max_jerk" value="5.0" />    <!-- 最大 jerk [m/s³] -->
+
+    <!-- ===== 节点 ===== -->
     <node pkg="uav_px4_ctrl" type="px4ctrl_node" name="px4ctrl_node" output="screen" >
         <param name="control_mode" value="$(arg control_mode)" />
         <param name="battery_limit" value="$(arg battery_limit)" />
@@ -36,5 +56,6 @@
         <param name="cmd_vel_max_z" value="$(arg cmd_vel_max_z)" />
         <param name="cmd_vel_max_acc" value="$(arg cmd_vel_max_acc)" />
         <param name="cmd_vel_max_jerk" value="$(arg cmd_vel_max_jerk)" />
+        <param name="odom_topic" value="$(arg odom_topic)" />
     </node>
 </launch>

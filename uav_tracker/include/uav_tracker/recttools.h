@@ -1,7 +1,27 @@
-/* 
+/**
+ * @file recttools.h
+ * @brief 矩形区域工具函数集（命名空间 RectTools）。
+ *
+ * @details
+ * 提供一组轻量级的 OpenCV 矩形操作模板函数，用于目标跟踪中的
+ * ROI 裁剪、边界限制和图像子窗口提取。
+ *
+ * 核心功能：
+ *   1. center()        — 计算矩形中心坐标
+ *   2. x2() / y2()    — 获取矩形右/下边界
+ *   3. resize()        — 以中心锚点缩放矩形
+ *   4. limit()         — 将矩形限制在指定边界内
+ *   5. getBorder()     — 计算裁切后的边界偏移
+ *   6. subwindow()     — 从图像中提取子窗口（含边界填充）
+ *   7. getGrayImage()  — 转换为灰度浮点图像
+ *
+ * 来源：KCF 开源实现 (Christian Bailer, DFKI)
+ */
+
+/*
 Author: Christian Bailer
-Contact address: Christian.Bailer@dfki.de 
-Department Augmented Vision DFKI 
+Contact address: Christian.Bailer@dfki.de
+Department Augmented Vision DFKI
 
                           License Agreement
                For Open Source Computer Vision Library
@@ -43,27 +63,39 @@ the use of this software, even if advised of the possibility of such damage.
 #define _OPENCV_RECTTOOLS_HPP_
 #endif
 
+// ============================================================================
+// RectTools — 矩形工具函数命名空间
+// ============================================================================
+
 namespace RectTools
 {
 
+/** @brief 计算矩形中心坐标。 @param rect 输入矩形 @return 中心点坐标 (x + w/2, y + h/2) [pixel] */
 template <typename t>
 inline cv::Vec<t, 2 > center(const cv::Rect_<t> &rect)
 {
     return cv::Vec<t, 2 > (rect.x + rect.width / (t) 2, rect.y + rect.height / (t) 2);
 }
 
+/** @brief 获取矩形右边界 x 坐标。 @param rect 输入矩形 @return rect.x + rect.width [pixel] */
 template <typename t>
 inline t x2(const cv::Rect_<t> &rect)
 {
     return rect.x + rect.width;
 }
 
+/** @brief 获取矩形下边界 y 坐标。 @param rect 输入矩形 @return rect.y + rect.height [pixel] */
 template <typename t>
 inline t y2(const cv::Rect_<t> &rect)
 {
     return rect.y + rect.height;
 }
 
+/** @brief 以中心为锚点等比缩放矩形。
+ *  @param rect   [in/out] 待缩放的矩形
+ *  @param scalex x 方向缩放因子（>1 放大，<1 缩小）
+ *  @param scaley y 方向缩放因子（默认与 scalex 相同）
+ */
 template <typename t>
 inline void resize(cv::Rect_<t> &rect, float scalex, float scaley = 0)
 {
@@ -76,6 +108,10 @@ inline void resize(cv::Rect_<t> &rect, float scalex, float scaley = 0)
 
 }
 
+/** @brief 将矩形裁剪至指定边界内。
+ *  @param rect  [in/out] 待限制的矩形
+ *  @param limit 边界矩形
+ */
 template <typename t>
 inline void limit(cv::Rect_<t> &rect, cv::Rect_<t> limit)
 {
@@ -95,12 +131,24 @@ inline void limit(cv::Rect_<t> &rect, cv::Rect_<t> limit)
     if(rect.height<0)rect.height=0;
 }
 
+/** @brief 将矩形裁剪至指定尺寸范围内（重载版本）。
+ *  @param rect   [in/out] 待限制的矩形
+ *  @param width  最大允许宽度 [pixel]
+ *  @param height 最大允许高度 [pixel]
+ *  @param x      左边界 [pixel]（默认 0）
+ *  @param y      上边界 [pixel]（默认 0）
+ */
 template <typename t>
 inline void limit(cv::Rect_<t> &rect, t width, t height, t x = 0, t y = 0)
 {
     limit(rect, cv::Rect_<t > (x, y, width, height));
 }
 
+/** @brief 计算裁切后相对于原始矩形的边界偏移。
+ *  @param original 原始矩形
+ *  @param limited  裁切后的矩形
+ *  @return 边界偏移矩形 (x=左偏移, y=上偏移, width=右偏移, height=下偏移) [pixel]
+ */
 template <typename t>
 inline cv::Rect getBorder(const cv::Rect_<t > &original, cv::Rect_<t > & limited)
 {
@@ -113,6 +161,15 @@ inline cv::Rect getBorder(const cv::Rect_<t > &original, cv::Rect_<t > & limited
     return res;
 }
 
+/** @brief 从图像中提取子窗口（含边界复制填充）。
+ *  @param in         输入图像
+ *  @param window     目标窗口区域 [pixel]
+ *  @param borderType 边界填充模式（默认: cv::BORDER_CONSTANT）
+ *  @return 提取的子窗口图像
+ *
+ *  若窗口超出图像边界，使用 borderType 模式填充超出区域。
+ *  若窗口完全在图像内部，直接返回 ROI 引用。
+ */
 inline cv::Mat subwindow(const cv::Mat &in, const cv::Rect & window, int borderType = cv::BORDER_CONSTANT)
 {
     cv::Rect cutWindow = window;
@@ -128,6 +185,10 @@ inline cv::Mat subwindow(const cv::Mat &in, const cv::Rect & window, int borderT
     return res;
 }
 
+/** @brief 将图像转换为归一化灰度浮点图。
+ *  @param img 输入 BGR 彩色图像
+ *  @return 归一化灰度浮点图（像素值范围 [0, 1]）
+ */
 inline cv::Mat getGrayImage(cv::Mat img)
 {
     cv::cvtColor(img, img, 6);
@@ -137,6 +198,3 @@ inline cv::Mat getGrayImage(cv::Mat img)
 }
 
 }
-
-
-

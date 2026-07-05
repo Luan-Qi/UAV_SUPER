@@ -1,2 +1,3 @@
 .vscode/
+..catkin_tools/
 /CMakeLists.txt

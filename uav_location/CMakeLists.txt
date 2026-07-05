@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   nav_msgs
   geometry_msgs
+  mavros_msgs
   pcl_ros
   pcl_conversions
   tf
@@ -29,18 +30,22 @@ include_directories(
   ${EIGEN3_INCLUDE_DIRS}
 )
 
-add_executable(fast_lio_localization src/global_localization.cpp)
-target_link_libraries(fast_lio_localization ${catkin_LIBRARIES} fast_gicp)
-add_dependencies(fast_lio_localization ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_executable(fast_lio_localization src/global_localization.cpp)
+# target_link_libraries(fast_lio_localization ${catkin_LIBRARIES} fast_gicp)
+# add_dependencies(fast_lio_localization ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(publish_initial_pose src/publish_initial_pose.cpp)
-target_link_libraries(publish_initial_pose ${catkin_LIBRARIES})
-add_dependencies(publish_initial_pose ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_executable(publish_initial_pose src/publish_initial_pose.cpp)
+# target_link_libraries(publish_initial_pose ${catkin_LIBRARIES})
+# add_dependencies(publish_initial_pose ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(transform_fusion src/transform_fusion.cpp)
-target_link_libraries(transform_fusion ${catkin_LIBRARIES})
-add_dependencies(transform_fusion ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_executable(transform_fusion src/transform_fusion.cpp)
+# target_link_libraries(transform_fusion ${catkin_LIBRARIES})
+# add_dependencies(transform_fusion ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(odom_republisher src/odom_republisher.cpp)
-target_link_libraries(odom_republisher ${catkin_LIBRARIES})
-add_dependencies(odom_republisher ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# ---- fast_ofio: Fast Optical-Flow Inertial Odometry ----
+add_executable(fast_ofio
+  src/fast_ofio/fast_ofio_node.cpp
+  src/fast_ofio/ofio_estimator.cpp
+)
+target_link_libraries(fast_ofio ${catkin_LIBRARIES})
+add_dependencies(fast_ofio ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

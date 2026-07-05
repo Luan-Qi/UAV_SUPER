@@ -1,22 +1,42 @@
 <launch>
-    <!-- 输入话题（odom 优先） -->
-    <arg name="odom_topic" default="/localization"/>
-    <arg name="pose_topic" default="/mavros/local_position/pose"/>
-    <arg name="goal_topic" default="/goal_pose"/>
-    <!-- 到达阈值 -->
-    <arg name="distance_threshold" default="1.0"/>
-    <!-- 到达后等待时间 -->
-    <arg name="wait_time" default="5.0"/>
-    <!-- 启动延迟时间 -->
-    <arg name="start_delay" default="3.0"/>
-    <!-- 位置话题超时时间（秒） -->
-    <arg name="topic_timeout" default="2.0"/>
-    <!-- 任务循环选项 -->
-    <arg name="mission_cycle" default="false"/>
-    <!-- 路径点 -->
+    <!-- mission_manger — 任务管理器（航点序列调度、录像控制、规划重试） -->
+    <!--
+      功能：全自主飞行任务调度器，管理航点序列切换、录像自动控制、规划失败重试。
+      依赖：px4ctrl (起飞通知), 里程计/位姿话题, 全局规划器 (接收 goal_pose)
+      用法：roslaunch uav_px4_ctrl mission_manger.launch
+
+      系统架构/数据流：
+        里程计/位姿 ──→ mission_manger ──→ start_pose (规划初始位姿)
+                                        ──→ goal_pose  (目标航点)
+                                        ──→ /camera_recorder/record_control (录像起停)
+        规划器失败 ──→ /planner_fail_notify (srv) → 自动重试(最多3次)
+
+      航点字符串格式: "[[x,y,z,wait]*,[x,y,z,wait],...]"
+        - wait: 到达后等待时间 [s] (0 = 无限等待)
+        - *:    录像标记 (录像起/停控制)
+    -->
+
+    <!-- ===== 输入话题（odom 优先） ===== -->
+    <arg name="odom_topic" default="/localization"/>           <!-- 里程计话题 -->
+    <arg name="pose_topic" default="/mavros/local_position/pose"/>  <!-- 本地位姿话题（odom 不可用时使用） -->
+    <arg name="goal_topic" default="/goal_pose"/>              <!-- 目标航点发布话题 -->
+
+    <!-- ===== 到达阈值 ===== -->
+    <arg name="distance_threshold" default="0.5"/>  <!-- 到达判定欧氏距离阈值 [m] -->
+
+    <!-- ===== 时序参数 ===== -->
+    <arg name="wait_time" default="5.0"/>           <!-- 到达后默认等待时间 [s] -->
+    <arg name="start_delay" default="5.0"/>         <!-- 起飞后启动延迟 [s] -->
+    <arg name="topic_timeout" default="2.0"/>       <!-- 位姿话题超时告警 [s] -->
+
+    <!-- ===== 任务模式 ===== -->
+    <arg name="mission_cycle" default="true"/>      <!-- 是否循环执行航点 -->
+
+    <!-- ===== 航点列表 ===== -->
+    <!-- 格式: [[x,y,z[,wait]][*], ...] -->
     <arg name="waypoints" default="[[35.0, 0.0, 0.6]*, [52.0, -10.0, 0.8], [52.0, -0.0, 1.0]*, [52.0, -20.0, 0.8]*, [0.0, 0.0, 0.7]]"/>
 
-    <!-- 使用参数 -->
+    <!-- ===== 节点 ===== -->
     <node pkg="uav_px4_ctrl" type="mission_manger" name="mission_manger" output="screen">
         <param name="odom_topic" value="$(arg odom_topic)"/>
         <param name="pose_topic" value="$(arg pose_topic)"/>
@@ -29,4 +49,3 @@
         <param name="waypoints" value="$(arg waypoints)"/>
     </node>
 </launch>
-

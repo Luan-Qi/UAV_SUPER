@@ -1,0 +1,120 @@
+<launch>
+    <!-- fast_ofio — Fast Optical-Flow Inertial Odometry -->
+    <!-- 依赖: MAVROS (光流+IMU), 板载光流传感器 (PMW3901+VL53L1X 等) -->
+    <!-- 用法: roslaunch uav_location fast_ofio.launch scale_factor:=1.05 -->
+
+    <!-- ===== 话题 ===== -->
+    <arg name="flow_topic"     default="/mavros/px4flow/raw/optical_flow_rad"/>
+    <arg name="imu_topic"      default="/mavros/imu/data"/>
+    <arg name="odom_topic"     default="/Odometry"/>
+    <arg name="world_frame_id" default="map"/>
+    <arg name="body_frame_id"  default="base_link"/>
+    <arg name="odom_frame_id"  default="odom"/>
+
+    <!-- ===== 里程计模式 ===== -->
+    <arg name="use_body_frame_odom" default="true"/>  <!-- true: FLU 机体对齐 (X=前 Y=左 Z=上) | false: ENU 世界系 -->
+
+    <!-- ===== 光流传感器安装偏移 (body系 FRD, 相对IMU/机体原点) ===== -->
+    <arg name="flow_pos_x" default="0.0"/>  <!-- 前为正 [m] -->
+    <arg name="flow_pos_y" default="0.0"/>  <!-- 右为正 [m] -->
+    <arg name="flow_pos_z" default="0.0"/>  <!-- 下为正 (低于IMU为正) [m] -->
+
+    <!-- ===== 传感器标定 ===== -->
+    <arg name="scale_factor"  default="1.05"/>   <!-- 尺度校正因子 (>1=读数偏小) -->
+    <arg name="flow_rotation" default="0.0"/>   <!-- 绕Z轴安装旋转角 [rad] -->
+
+    <!-- ===== 质量门限 ===== -->
+    <arg name="quality_min"   default="60"/>    <!-- 最低质量 (0-255) -->
+    <arg name="flow_max_rate" default="2.5"/>   <!-- 最大光流角速率 [rad/s] -->
+    <arg name="min_height"    default="0.08"/>   <!-- 最小有效高度 [m] -->
+    <arg name="max_height"    default="5.0"/>  <!-- 最大有效高度 [m] -->
+    <arg name="max_gyro_rate" default="0.05"/>  <!-- 静止判定角速度阈值 [rad/s] -->
+
+    <!-- ===== Range 初始偏移与 Z 轴障碍物检测 ===== -->
+    <arg name="auto_range_offset"          default="true"/>  <!-- 自动识别初始离地距离并扣除 -->
+    <arg name="obstacle_z_threshold"       default="0.3"/>   <!-- 障碍物判定 innovation 阈值 [m] -->
+    <arg name="z_imu_stationary_threshold" default="0.5"/>   <!-- IMU 定高判定阈值 [m/s²] -->
+    <arg name="obstacle_confirm_frames"    default="3"/>     <!-- 连续确认 OBSTACLE 帧数 -->
+    <arg name="obstacle_recover_frames"    default="5"/>     <!-- 连续确认 NORMAL 恢复帧数 -->
+    <arg name="obstacle_recovery_threshold" default="0.2"/>  <!-- 恢复 innovation 阈值 [m] -->
+    <arg name="z_velocity_decay_tau"       default="2.0"/>   <!-- OBSTACLE 下 Z 速度衰减时间常数 [s] -->
+    <arg name="max_z_prediction_time"      default="5.0"/>   <!-- 最大无 range 校正预测时间 [s] -->
+
+    <!-- ===== 噪声模型 ===== -->
+    <arg name="flow_noise"          default="0.05"/>
+    <arg name="flow_noise_qual_min" default="0.001"/>
+    <arg name="gyro_noise"          default="0.001"/>
+
+    <!-- ===== 偏置估计 ===== -->
+    <arg name="bias_estimation_tau" default="10.0"/>  <!-- LPF 时间常数 [s] -->
+    <arg name="bias_max"            default="0.1"/>   <!-- 偏置上限 [rad] -->
+
+    <!-- ===== 滤波 ===== -->
+    <arg name="velocity_lpf_cutoff" default="5.0"/>   <!-- 速度LPF截止频率 [Hz] -->
+    <arg name="height_lpf_cutoff"   default="2.0"/>   <!-- 高度LPF截止频率 [Hz] -->
+
+    <!-- ===== 时间同步 ===== -->
+    <arg name="max_flow_imu_dt" default="0.05"/>  <!-- 最大允许时间差 [s] -->
+    <arg name="flow_timeout"    default="0.5"/>   <!-- 超时 [s] -->
+
+    <!-- ===== 初始位姿 ===== -->
+    <arg name="initial_x"   default="0.0"/>
+    <arg name="initial_y"   default="0.0"/>
+    <arg name="initial_z"   default="0.0"/>
+    <arg name="initial_yaw" default="0.0"/>  <!-- [rad] -->
+
+    <!-- ===== 发布频率 ===== -->
+    <arg name="publish_rate" default="30.0"/>  <!-- [Hz] -->
+
+    <!-- ===== 节点 ===== -->
+    <node pkg="uav_location" type="fast_ofio" name="fast_ofio" output="screen">
+        <param name="flow_topic"           value="$(arg flow_topic)"/>
+        <param name="imu_topic"            value="$(arg imu_topic)"/>
+        <param name="odom_topic"           value="$(arg odom_topic)"/>
+        <param name="world_frame_id"       value="$(arg world_frame_id)"/>
+        <param name="body_frame_id"        value="$(arg body_frame_id)"/>
+        <param name="odom_frame_id"        value="$(arg odom_frame_id)"/>
+        <param name="use_body_frame_odom"  value="$(arg use_body_frame_odom)"/>
+
+        <param name="flow_pos_x"           value="$(arg flow_pos_x)"/>
+        <param name="flow_pos_y"           value="$(arg flow_pos_y)"/>
+        <param name="flow_pos_z"           value="$(arg flow_pos_z)"/>
+
+        <param name="scale_factor"         value="$(arg scale_factor)"/>
+        <param name="flow_rotation"        value="$(arg flow_rotation)"/>
+
+        <param name="quality_min"          value="$(arg quality_min)"/>
+        <param name="flow_max_rate"        value="$(arg flow_max_rate)"/>
+        <param name="min_height"           value="$(arg min_height)"/>
+        <param name="max_height"           value="$(arg max_height)"/>
+        <param name="max_gyro_rate"                value="$(arg max_gyro_rate)"/>
+        <param name="auto_range_offset"           value="$(arg auto_range_offset)"/>
+        <param name="obstacle_z_threshold"        value="$(arg obstacle_z_threshold)"/>
+        <param name="z_imu_stationary_threshold"  value="$(arg z_imu_stationary_threshold)"/>
+        <param name="obstacle_confirm_frames"     value="$(arg obstacle_confirm_frames)"/>
+        <param name="obstacle_recover_frames"     value="$(arg obstacle_recover_frames)"/>
+        <param name="obstacle_recovery_threshold" value="$(arg obstacle_recovery_threshold)"/>
+        <param name="z_velocity_decay_tau"        value="$(arg z_velocity_decay_tau)"/>
+        <param name="max_z_prediction_time"       value="$(arg max_z_prediction_time)"/>
+
+        <param name="flow_noise"           value="$(arg flow_noise)"/>
+        <param name="flow_noise_qual_min"  value="$(arg flow_noise_qual_min)"/>
+        <param name="gyro_noise"           value="$(arg gyro_noise)"/>
+
+        <param name="bias_estimation_tau"  value="$(arg bias_estimation_tau)"/>
+        <param name="bias_max"             value="$(arg bias_max)"/>
+
+        <param name="velocity_lpf_cutoff"  value="$(arg velocity_lpf_cutoff)"/>
+        <param name="height_lpf_cutoff"    value="$(arg height_lpf_cutoff)"/>
+
+        <param name="max_flow_imu_dt"      value="$(arg max_flow_imu_dt)"/>
+        <param name="flow_timeout"         value="$(arg flow_timeout)"/>
+
+        <param name="initial_x"            value="$(arg initial_x)"/>
+        <param name="initial_y"            value="$(arg initial_y)"/>
+        <param name="initial_z"            value="$(arg initial_z)"/>
+        <param name="initial_yaw"          value="$(arg initial_yaw)"/>
+
+        <param name="publish_rate"         value="$(arg publish_rate)"/>
+    </node>
+</launch>

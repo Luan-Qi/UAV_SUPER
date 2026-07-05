@@ -1,6 +1,39 @@
 <launch>
+    <!-- KCFTracker — KCF 视觉跟踪 + 无人机视觉伺服控制 -->
+    <!-- 功能: 启动 Orbbec Gemini 330 深度相机驱动，运行 KCF 跟踪节点和目标跟随控制节点 -->
+    <!-- 依赖: orbbec_camera 驱动, MAVROS, KCF_Tracker 节点, KCF_Tracker_control 节点 -->
+    <!-- 用法: roslaunch uav_tracker KCFTracker.launch -->
+    <!--
+        数据流:
+          Orbbec Gemini 330
+            ├── /camera/color/image_raw ──→ KCF_Tracker ──→ /tracker/target_position
+            │                               (鼠标框选+KCF跟踪)    (pixel_err_x, pixel_err_y, depth_z)
+            └── /camera/depth/image_raw ──→                    ──→ /tracker/is_tracking
+                                                                      │
+            MAVROS 飞控                                                  │
+            ├── mavros/state ────────────────────────────────────────────┤
+            └── mavros/local_position/pose ──────────────────────────────┤
+                                                                         ▼
+                                                              KCF_Tracker_control
+                                                              (PID 速度解算 + 姿态补偿)
+                                                                         │
+                                                                         ▼
+                                                   /mavros/setpoint_velocity/cmd_vel_unstamped
+                                                   (geometry_msgs/Twist: vx,vy,vz, yaw_rate)
+    -->
+
+    <!-- ===== 相机驱动 ===== -->
+    <!-- 启动 Orbbec Gemini 330 系列深度相机 (彩色 + 深度 + IMU) -->
     <include file="$(find orbbec_camera)/launch/gemini_330_series.launch"/>
-    <!-- 距离相机的范围【0.3米，8米】，否则无效-->
+
+    <!-- ===== 距离限制 ===== -->
+    <!-- 距离相机的范围 [0.3米, 8米]，否则无效 -->
+
+    <!-- ===== KCF 跟踪节点 ===== -->
+    <!-- KCF_Tracker: 订阅彩色+深度图像，鼠标框选 ROI，KCF 实时跟踪，发布目标像素误差与深度 -->
     <node name="KCF_Tracker" pkg="uav_tracker" type="KCFTracker_node" required="true" output="screen"/>
+
+    <!-- ===== 视觉伺服控制节点 ===== -->
+    <!-- KCF_Tracker_control: 接收目标位置，通过 PID 计算无人机速度指令，发布 cmd_vel -->
     <node name="KCF_Tracker_control" pkg="uav_tracker" type="KCFTracker_control_node" required="true" output="screen"/>
 </launch>

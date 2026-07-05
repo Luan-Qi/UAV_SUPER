@@ -1,13 +1,38 @@
 <launch>
-  <!-- 启动 MAVROS -->
+  <!-- uav_super_px4_livox — PX4 + Livox MID360 传感器联合启动文件 -->
+  <!--
+    功能：同时启动 MAVROS (PX4 通信桥) 和 Livox MID360 激光雷达驱动，
+          为上层里程计和控制节点提供硬件通信基础设施。
+
+    依赖：
+      - mavros (px4.launch) — PX4 飞控 MAVLink 通信桥
+      - livox_ros_driver2 (msg_MID360.launch) — 览沃 MID360 激光雷达 ROS1 驱动
+
+    系统架构：
+      PX4 飞控 ──→ MAVROS ──→ /mavros/* (state/imu/rc/pose...)
+      Livox MID360 ──→ livox_ros_driver2 ──→ /livox/lidar (PointCloud2)
+
+    用法：
+      roslaunch uav_px4_ctrl_test uav_super_px4_livox.launch
+
+    注意：
+      - 此文件仅启动硬件驱动层，上层里程计需额外启动 fast_lio 等
+      - MAVROS 默认通过串口连接 PX4，如需指定端口请取消 fcu_url 注释
+  -->
+
+  <!-- ===== MAVROS PX4 通信桥 ===== -->
   <include file="$(find mavros)/launch/px4.launch">
-    <!-- 如果需要，可以在这里传入参数 -->
+    <!-- 如需指定串口设备，取消下行注释并填入正确设备路径 -->
     <!-- <arg name="fcu_url" value="/dev/ttyUSB0:921600" /> -->
   </include>
 
-  <!-- 启动 Livox MID360 驱动 -->
+  <!-- ===== Livox MID360 激光雷达驱动 ===== -->
+  <!--
+    功能：启动 MID360 激光雷达，发布 /livox/lidar PointCloud2 话题。
+    可通过 xfer_format 修改点云格式 (0=PointCloud2, 1=自定义, 2=LVX文件)。
+  -->
   <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch">
-    <!-- 例如可在此修改 frame_id 或配置文件路径 -->
+    <!-- 如需修改点云格式或配置文件路径，取消下行注释 -->
     <!-- <arg name="xfer_format" value="1" /> -->
   </include>
 

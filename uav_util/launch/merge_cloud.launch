@@ -1,22 +1,55 @@
 <launch>
-  <param name="cloud1_topic" value="/livox/lidar_192_168_1_xx1" />
-  <param name="cloud2_topic" value="/livox/lidar_192_168_1_xx2" />
+    <!-- merge_cloud — 双激光雷达点云时间同步与空间融合 -->
+    <!-- 依赖: Livox SDK, message_filters, tf2, uav_util/merge_cloud_node -->
+    <!-- 用法: roslaunch uav_util merge_cloud.launch -->
+    <!--
+      数据流:
+        /livox/lidar_192_168_1_xx1 ──▶ transform1 (R1|t1) ──┐
+                                                              ├──▶ /merged_cloud
+        /livox/lidar_192_168_1_xx2 ──▶ transform2 (R2|t2) ──┘
+              (sensor_msgs::PointCloud2 ×2)    (sensor_msgs::PointCloud2 ×1)
 
-  <!-- cloud1 transform (radians, meters) -->
-  <param name="roll1"  value="0.0" />
-  <param name="pitch1" value="0.0" />
-  <param name="yaw1"   value="0.0" />
-  <param name="tx1"    value="0.0" />
-  <param name="ty1"    value="0.0" />
-  <param name="tz1"    value="0.0" />
+      工作原理:
+        1. 订阅两个 LiDAR 原始点云话题
+        2. 使用 message_filters::TimeSynchronizer 同步时间戳
+        3. 分别按各 LiDAR 外参 (roll/pitch/yaw + tx/ty/tz) 变换到 base_link
+        4. 拼接后发布到 /merged_cloud
+    -->
 
-  <!-- cloud2 transform (radians, meters) -->
-  <param name="roll2"  value="0.0" />
-  <param name="pitch2" value="0.0" />
-  <param name="yaw2"   value="0.0" />
-  <param name="tx2"    value="0.0" />
-  <param name="ty2"    value="0.0" />
-  <param name="tz2"    value="0.0" />
+    <!-- ===== LiDAR 1 话题与变换 ===== -->
+    <param name="cloud1_topic" value="/livox/lidar_192_168_1_xx1" />  <!-- LiDAR 1 点云订阅话题 -->
 
-  <node name="merge_cloud_node" pkg="uav_util" type="merge_cloud_node" output="screen" />
+    <!-- LiDAR 1 外参变换 (相对 base_link, 先旋转再平移) -->
+    <param name="roll1"  value="0.0" />  <!-- [rad] -->
+    <param name="pitch1" value="0.0" />  <!-- [rad] -->
+    <param name="yaw1"   value="0.0" />  <!-- [rad] -->
+    <param name="tx1"    value="0.0" />  <!-- [m] -->
+    <param name="ty1"    value="0.0" />  <!-- [m] -->
+    <param name="tz1"    value="0.0" />  <!-- [m] -->
+
+    <!-- ===== LiDAR 2 话题与变换 ===== -->
+    <param name="cloud2_topic" value="/livox/lidar_192_168_1_xx2" />  <!-- LiDAR 2 点云订阅话题 -->
+
+    <!-- LiDAR 2 外参变换 (相对 base_link, 先旋转再平移) -->
+    <param name="roll2"  value="0.0" />  <!-- [rad] -->
+    <param name="pitch2" value="0.0" />  <!-- [rad] -->
+    <param name="yaw2"   value="0.0" />  <!-- [rad] -->
+    <param name="tx2"    value="0.0" />  <!-- [m] -->
+    <param name="ty2"    value="0.0" />  <!-- [m] -->
+    <param name="tz2"    value="0.0" />  <!-- [m] -->
+
+    <!-- ===== 使用示例 ===== -->
+    <!-- 默认 (需修改话题):  roslaunch uav_util merge_cloud.launch -->
+    <!-- 指定 LiDAR IP:      roslaunch uav_util merge_cloud.launch \
+                               cloud1_topic:=/livox/lidar_192_168_1_133 \
+                               cloud2_topic:=/livox/lidar_192_168_1_134 -->
+    <!-- 带外参偏移 (前方0.3m): roslaunch uav_util merge_cloud.launch \
+                               cloud1_topic:=/livox/lidar_192_168_1_133 tx1:=0.3 yaw1:=0.0 -->
+    <!-- 背对背安装双雷达:    roslaunch uav_util merge_cloud.launch \
+                               cloud1_topic:=/livox/lidar_192_168_1_133 yaw1:=0.0 \
+                               cloud2_topic:=/livox/lidar_192_168_1_134 yaw2:=3.14159 -->
+
+    <!-- ===== 节点 ===== -->
+    <!-- 时间同步双 LiDAR, 按各自外参变换, 拼接后发布融合点云 -->
+    <node name="merge_cloud_node" pkg="uav_util" type="merge_cloud_node" output="screen" />
 </launch>

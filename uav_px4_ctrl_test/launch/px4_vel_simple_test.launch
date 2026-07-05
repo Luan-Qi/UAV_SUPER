@@ -1,7 +1,32 @@
 <launch>
-    <include file="$(find fast_lio)/launch/mapping_mid360.launch" >
-        <arg name="rviz" value="false" />
+    <!-- px4_vel_simple_test — PX4 综合控制测试启动文件 -->
+    <!--
+      功能：同时启动 Fast-LIO 激光里程计和 PX4 综合控制节点，
+            由 px4_vel_simple_test 节点接收里程计并发布视觉位姿到 PX4。
+
+      依赖：
+        - fast_lio (mapping_mid360.launch) — Livox MID360 激光里程计
+        - uav_px4_ctrl_test (px4_vel_simple_test) — RC 状态机 + 位置/速度双模式控制
+        - subscribe.h/cpp (来自 uav_px4_ctrl) — RC/Battery/State/Odom 数据类型
+
+      系统架构：
+        Livox MID360 ──→ fast_lio ──→ /Odometry ──→ px4_vel_simple_test ──→ /mavros/vision_pose/pose
+                                                                    ├──→ /mavros/setpoint_position/local
+                                                                    └──→ /mavros/setpoint_velocity/cmd_vel
+
+      用法：
+        roslaunch uav_px4_ctrl_test px4_vel_simple_test.launch
+    -->
+
+    <!-- ===== 激光里程计 (Fast-LIO + Livox MID360) ===== -->
+    <include file="$(find fast_lio)/launch/mapping_mid360.launch">
+        <arg name="rviz" value="false" />  <!-- 不启动 RViz（减少板载负载） -->
     </include>
-    
+
+    <!-- ===== PX4 综合控制节点 ===== -->
+    <!--
+      功能：里程计桥接 + RC 状态机 + 位置/速度双模式控制
+      控制模式由遥控器 CH5 (arm) / CH6 (offboard) / CH7 (command/hold) 切换
+    -->
     <node pkg="uav_px4_ctrl_test" type="px4_vel_simple_test" name="px4_vel_simple_test" output="screen" />
 </launch>

@@ -1,0 +1,83 @@
+<launch>
+    <!-- imu_health_check — IMU 原始数据健康检测节点 -->
+    <!-- 依赖: sensor_msgs/Imu, uav_util/imu_health_check_node -->
+    <!-- 用法: roslaunch uav_util imu_health_check.launch imu_topic:=/mavros/imu/data_raw -->
+    <!--
+      检测流程:
+        1. 初始静止采样校准 — 采集 calib_samples 帧建立基准 (IMU 保持静止)
+        2. 晃动阶段 — 提示晃动飞机/IMU shake_duration 秒
+        3. 恢复提示 — 提前 restore_notice_before 秒提示用户恢复静止
+        4. 静止后评估 — 比较偏置变化、噪声增长、数据跳变、疑似饱和, 输出健康结论
+    -->
+
+    <!-- ===== 话题配置 ===== -->
+    <arg name="imu_topic" default="/mavros/imu/data_raw" />
+
+    <!-- ===== 流程配置 ===== -->
+    <arg name="calib_samples" default="600" />           <!-- 启动时静止基准采样帧数 [frame] -->
+    <arg name="post_static_samples" default="600" />     <!-- 晃动后恢复静止采样帧数 [frame] -->
+    <arg name="shake_duration" default="10.0" />          <!-- 晃动阶段持续时间 [s] -->
+    <arg name="restore_notice_before" default="3.0" />    <!-- 晃动结束前提前提示恢复静止 [s] -->
+    <arg name="settle_duration" default="2.0" />          <!-- 停止晃动后机械稳定等待 [s] -->
+
+    <!-- ===== 判断阈值 ===== -->
+    <!-- ROS sensor_msgs/Imu 标准单位: accel [m/s²], gyro [rad/s] -->
+    <arg name="gravity_expected" default="9.80665" />     <!-- 期望重力加速度 [m/s²] -->
+    <arg name="gravity_tolerance" default="0.8" />        <!-- 重力容差 [m/s²] -->
+
+    <!-- 晃动前后静止均值变化阈值 -->
+    <arg name="gyro_bias_change_thresh" default="0.02" />  <!-- 陀螺偏置变化阈值 [rad/s] -->
+    <arg name="acc_bias_change_thresh" default="0.20" />   <!-- 加速度偏置变化阈值 [m/s²] -->
+    <arg name="acc_norm_change_thresh" default="0.20" />   <!-- 加速度模长变化阈值 [m/s²] -->
+
+    <!-- 噪声增大判断: 同时满足 ratio 和 abs delta 才报警 -->
+    <arg name="noise_ratio_thresh" default="3.0" />        <!-- 噪声比例阈值 (当前/基准) -->
+    <arg name="gyro_noise_increase_abs_thresh" default="0.01" />  <!-- 陀螺噪声绝对值增量阈值 [rad/s] -->
+    <arg name="acc_noise_increase_abs_thresh" default="0.10" />   <!-- 加计噪声绝对值增量阈值 [m/s²] -->
+
+    <!-- 恢复静止窗口自身抖动检测 -->
+    <arg name="gyro_static_std_warn" default="0.02" />  <!-- 陀螺静止标准差报警 [rad/s] -->
+    <arg name="acc_static_std_warn" default="0.15" />   <!-- 加计静止标准差报警 [m/s²] -->
+
+    <!-- 恢复静止窗口内相邻帧原始数据跳变阈值 -->
+    <arg name="gyro_static_jump_thresh" default="0.20" />  <!-- 陀螺跳变阈值 [rad/s] -->
+    <arg name="acc_static_jump_thresh" default="1.00" />   <!-- 加计跳变阈值 [m/s²] -->
+
+    <!-- 时间戳连续性检查 -->
+    <arg name="max_dt_warn" default="0.20" />  <!-- 最大允许帧间隔 [s] -->
+
+    <!-- 疑似饱和阈值 (约 2000 deg/s 和 16 g，可按 IMU 量程调整) -->
+    <arg name="gyro_saturation_abs" default="34.9" />   <!-- 陀螺饱和判定 [rad/s] (≈2000 deg/s) -->
+    <arg name="acc_saturation_abs" default="156.9" />   <!-- 加计饱和判定 [m/s²] (≈16 g) -->
+
+    <!-- ===== 使用示例 ===== -->
+    <!-- 默认话题:   roslaunch uav_util imu_health_check.launch -->
+    <!-- 自定义话题: roslaunch uav_util imu_health_check.launch imu_topic:=/mavros/imu/data -->
+    <!-- 延长晃动:   roslaunch uav_util imu_health_check.launch shake_duration:=15.0 calib_samples:=1000 -->
+
+    <!-- ===== 节点 ===== -->
+    <!-- 订阅 IMU 话题, 按流程引导用户完成晃动测试, 输出加速度/角速度健康评估报告 -->
+    <node pkg="uav_util" type="imu_health_check_node" name="imu_health_check" output="screen">
+        <param name="imu_topic" value="$(arg imu_topic)" />
+        <param name="calib_samples" value="$(arg calib_samples)" />
+        <param name="post_static_samples" value="$(arg post_static_samples)" />
+        <param name="shake_duration" value="$(arg shake_duration)" />
+        <param name="restore_notice_before" value="$(arg restore_notice_before)" />
+        <param name="settle_duration" value="$(arg settle_duration)" />
+        <param name="gravity_expected" value="$(arg gravity_expected)" />
+        <param name="gravity_tolerance" value="$(arg gravity_tolerance)" />
+        <param name="gyro_bias_change_thresh" value="$(arg gyro_bias_change_thresh)" />
+        <param name="acc_bias_change_thresh" value="$(arg acc_bias_change_thresh)" />
+        <param name="acc_norm_change_thresh" value="$(arg acc_norm_change_thresh)" />
+        <param name="noise_ratio_thresh" value="$(arg noise_ratio_thresh)" />
+        <param name="gyro_noise_increase_abs_thresh" value="$(arg gyro_noise_increase_abs_thresh)" />
+        <param name="acc_noise_increase_abs_thresh" value="$(arg acc_noise_increase_abs_thresh)" />
+        <param name="gyro_static_std_warn" value="$(arg gyro_static_std_warn)" />
+        <param name="acc_static_std_warn" value="$(arg acc_static_std_warn)" />
+        <param name="gyro_static_jump_thresh" value="$(arg gyro_static_jump_thresh)" />
+        <param name="acc_static_jump_thresh" value="$(arg acc_static_jump_thresh)" />
+        <param name="max_dt_warn" value="$(arg max_dt_warn)" />
+        <param name="gyro_saturation_abs" value="$(arg gyro_saturation_abs)" />
+        <param name="acc_saturation_abs" value="$(arg acc_saturation_abs)" />
+    </node>
+</launch>

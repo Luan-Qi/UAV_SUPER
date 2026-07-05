@@ -14,17 +14,68 @@
     limitations under the License.
 -->
 
+<!--
+    @file mapping_mid360.launch
+    @brief ROS1 launch 文件：使用 Livox Mid-360 LiDAR 进行 Cartographer 3D 建图。
+
+    @details
+    该 launch 文件启动 Cartographer SLAM 建图所需的全部节点：
+    - robot_state_publisher     : 发布 UAV 的 URDF 模型 TF 变换树。
+    - cartographer_node         : Cartographer 核心 SLAM 节点（3D 模式），
+                                  订阅 LiDAR 点云、IMU 数据和里程计。
+    - cartographer_occupancy_grid_node : 将 Cartographer 子图发布为
+                                  占据栅格地图话题。
+    - (可选) rosbag play        : 回放预先录制的 rosbag 数据包。
+    - (可选) rviz               : 3D 可视化界面。
+
+    话题重映射：
+    - points2    → /livox/lidar    (Livox LiDAR 点云输入)
+    - imu        → /livox/imu      (Livox 内置 IMU 数据)
+    - /odom      → /Odometry       (外部里程计话题)
+
+    @section usage 使用方法
+    @code{.sh}
+    # 使用 rosbag 在线建图（默认）
+    roslaunch uav_localization mapping_mid360.launch
+
+    # 仅建图，不播放 rosbag
+    roslaunch uav_localization mapping_mid360.launch use_bag:=false
+
+    # 建图但不启动 rviz
+    roslaunch uav_localization mapping_mid360.launch rviz:=false
+    @endcode
+
+    @author 鸾棋
+    @date   2025
+-->
+
 <launch>
+    <!-- 使用真实时间（非仿真时间） -->
     <param name="/use_sim_time" value="false" />
+
+    <!--
+        @arg use_bag [bool] 是否播放 rosbag 数据包（默认 true）。
+    -->
     <arg name="use_bag" default="true" />
+
+    <!--
+        @arg rviz [bool] 是否启动 rviz 可视化（默认 true）。
+    -->
     <arg name="rviz" default="true" />
 
+    <!-- 加载 UAV URDF 模型 -->
     <param name="robot_description"
         textfile="$(find uav_localization)/urdf/uav_super.urdf" />
 
+    <!-- robot_state_publisher: 解析 URDF 并发布 TF 变换 -->
     <node name="robot_state_publisher" pkg="robot_state_publisher"
         type="robot_state_publisher" />
 
+    <!--
+        cartographer_node: Cartographer 核心 3D SLAM 节点。
+        配置文件: mid360_3d.lua（无初始地图的纯建图模式）。
+        输入: /livox/lidar (PointCloud2), /livox/imu (IMU), /Odometry
+    -->
     <node name="cartographer_node" pkg="cartographer_ros"
         type="cartographer_node" args="
             -configuration_directory $(find uav_localization)/config
@@ -35,13 +86,26 @@
         <remap from="/odom" to="/Odometry"/>
     </node>
 
+    <!--
+        cartographer_occupancy_grid_node: 将 Cartographer SLAM 子图
+        发布为占据栅格地图话题，分辨率为 0.05 m/格。
+    -->
     <node name="cartographer_occupancy_grid_node" pkg="cartographer_ros"
         type="cartographer_occupancy_grid_node" args="-resolution 0.05" />
 
+    <!--
+        rosbag play: 回放预先录制的 LiDAR/IMU 数据包。
+        仅在 use_bag:=true 时启动。
+    -->
     <group if="$(arg use_bag)">
-	    <node name="playbag" pkg="rosbag" type="play" args="--clock /mnt/nvme/rosbag/float2.bag -r 1" />
-	</group>
+        <node name="playbag" pkg="rosbag" type="play"
+            args="--clock /mnt/nvme/rosbag/float2.bag -r 1" />
+    </group>
 
+    <!--
+        rviz: 3D 可视化工具，加载 demo_3d.rviz 配置。
+        仅在 rviz:=true 时启动。
+    -->
     <group if="$(arg rviz)">
         <node name="rviz" pkg="rviz" type="rviz"
             args="-d $(find uav_localization)/config/demo_3d.rviz" />

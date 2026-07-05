@@ -1,7 +1,27 @@
+/**
+ * @file pub_goal.cpp
+ * @brief 命令行目标点发布工具 — 向指定话题发送一次 goal pose。
+ *
+ * @details
+ * 通过命令行参数指定目标点 (x, y, z, yaw) 和话题名称，发布一次
+ * geometry_msgs/PoseStamped 消息后立即退出。适用于：
+ *   1. 调试/测试时手动发送目标点
+ *   2. shell 脚本中批量发布 waypoints
+ *
+ * 话题：发布 — 用户指定 topic（默认 /move_base_simple/goal）
+ *
+ * 使用示例：
+ *   rosrun uav_px4_ctrl pub_goal 2.0 3.0 1.0 90 /move_base_simple/goal
+ */
+
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
+// ============================================================================
+// 入口
+// ============================================================================
 
 int main(int argc, char **argv)
 {
@@ -16,20 +36,20 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    double x = atof(argv[1]);
-    double y = atof(argv[2]);
-    double z = atof(argv[3]);
+    double x = atof(argv[1]);  ///< 目标 X 坐标 [m]
+    double y = atof(argv[2]);  ///< 目标 Y 坐标 [m]
+    double z = atof(argv[3]);  ///< 目标 Z 坐标 [m]
 
     double yaw_deg = 0.0;
     if (argc >= 5)
-        yaw_deg = atof(argv[4]);
-    double yaw_rad = yaw_deg * M_PI / 180.0;
+        yaw_deg = atof(argv[4]);           ///< 目标偏航角 [deg]
+    double yaw_rad = yaw_deg * M_PI / 180.0;  ///< 目标偏航角 [rad]
 
     std::string topic_name = "/move_base_simple/goal";
     if (argc >= 6)
-        topic_name = argv[5];
+        topic_name = argv[5];  ///< 目标话题名称
 
-    // 计算四元数方向
+    // 计算四元数方向 (仅偏航旋转)
     tf2::Quaternion q;
     q.setRPY(0, 0, yaw_rad);
 

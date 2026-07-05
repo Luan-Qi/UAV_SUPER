@@ -1,0 +1,72 @@
+<launch>
+    <!-- imu_to_odom — IMU 积分里程计 (ZUPT 零速修正辅助) -->
+    <!-- 依赖: sensor_msgs/Imu, uav_util/imu_to_odom_node -->
+    <!-- 用法: roslaunch uav_util imu_to_odom.launch imu_topic:=/mavros/imu/data_raw -->
+    <!-- 原始项目: https://github.com/Abin1258/imu_to_odom -->
+    <!--
+      坐标系: odom → base_link (发布 nav_msgs/Odometry 和 nav_msgs/Path)
+      数据流:
+        /mavros/imu/data_raw (sensor_msgs/Imu)
+               │
+               ▼
+        ┌──────────────┐    ┌──────────────┐
+        │ 静止校准       │───▶│ ZUPT 检测     │
+        │ (bias估计)     │    │ (方差阈值)    │
+        └──────────────┘    └──────┬───────┘
+                                   │
+                      静止→零速修正  运动→死区+阻尼
+                                   │
+                                   ▼
+                          nav_msgs/Odometry  (imu_odom)
+                          nav_msgs/Path      (imu_path, RViz)
+    -->
+
+    <!-- ===== 话题配置 ===== -->
+    <arg name="imu_topic" default="/mavros/imu/data_raw" />  <!-- 订阅的 IMU 话题 -->
+    <arg name="odom_topic" default="imu_odom" />             <!-- 发布的里程计话题 -->
+    <arg name="path_topic" default="imu_path" />             <!-- 发布的累积路径话题 -->
+
+    <!-- ===== 坐标系配置 ===== -->
+    <arg name="odom_frame_id" default="odom" />         <!-- 父坐标系 (odom) [frame] -->
+    <arg name="base_frame_id" default="base_link" />    <!-- 子坐标系 (机器人基座) [frame] -->
+
+    <!-- ===== 校准配置 ===== -->
+    <arg name="calib_samples" default="200" />  <!-- 启动时静止校准采样帧数 (IMU 需保持静止) [frame] -->
+
+    <!-- ===== 静止检测 (ZUPT) ===== -->
+    <arg name="zupt_window" default="20" />         <!-- 滑动窗口大小 [frame] -->
+    <arg name="zupt_acc_thresh" default="0.01" />   <!-- 加速度方差阈值 [m²/s⁴] (低于=静止) -->
+    <arg name="zupt_gyro_thresh" default="0.005" /> <!-- 角速度方差阈值 [rad²/s²] (低于=静止) -->
+    <arg name="acc_deadzone" default="0.05" />      <!-- 运动状态加速度死区 [m/s²] -->
+    <arg name="vel_damping" default="0.5" />        <!-- 运动状态速度阻尼系数 [m/s] -->
+
+    <!-- ===== RViz 可视化 ===== -->
+    <arg name="rviz" default="true" />  <!-- 是否启动 RViz -->
+    <arg name="rviz_config" default="$(find uav_util)/rviz/imu_to_odom.rviz" />
+
+    <!-- ===== 使用示例 ===== -->
+    <!-- 默认参数:   roslaunch uav_util imu_to_odom.launch -->
+    <!-- 自定义IMU:  roslaunch uav_util imu_to_odom.launch imu_topic:=/imu0 calib_samples:=300 -->
+    <!-- 调整ZUPT:   roslaunch uav_util imu_to_odom.launch zupt_acc_thresh:=0.02 zupt_gyro_thresh:=0.01 -->
+
+    <!-- ===== 节点: imu_to_odom ===== -->
+    <!-- 订阅 IMU 数据, 进行 ZUPT 辅助的加速度/角速度积分, 发布里程计和轨迹 -->
+    <node pkg="uav_util" type="imu_to_odom_node" name="imu_to_odom" output="screen">
+        <param name="imu_topic" value="$(arg imu_topic)" />
+        <param name="odom_topic" value="$(arg odom_topic)" />
+        <param name="path_topic" value="$(arg path_topic)" />
+        <param name="odom_frame_id" value="$(arg odom_frame_id)" />
+        <param name="base_frame_id" value="$(arg base_frame_id)" />
+        <param name="calib_samples" value="$(arg calib_samples)" />
+        <param name="zupt_window" value="$(arg zupt_window)" />
+        <param name="zupt_acc_thresh" value="$(arg zupt_acc_thresh)" />
+        <param name="zupt_gyro_thresh" value="$(arg zupt_gyro_thresh)" />
+        <param name="acc_deadzone" value="$(arg acc_deadzone)" />
+        <param name="vel_damping" value="$(arg vel_damping)" />
+    </node>
+
+    <!-- ===== 节点: RViz ===== -->
+    <!-- 启动 RViz 可视化 imu_to_odom 轨迹 -->
+    <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz_imu_odom"
+          args="-d $(arg rviz_config)" />
+</launch>

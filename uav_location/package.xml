@@ -14,7 +14,9 @@
   <build_depend>geometry_msgs</build_depend>
   <build_depend>nav_msgs</build_depend>
   <build_depend>sensor_msgs</build_depend>
+  <build_depend>mavros_msgs</build_depend>
   <build_depend>fast_gicp</build_depend>
+  <exec_depend>mavros_msgs</exec_depend>
 
   <export></export>
 </package>

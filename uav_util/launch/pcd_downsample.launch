@@ -1,9 +1,24 @@
 <launch>
-    <!-- Declare argument -->
-    <arg name="pcd_path" default=""/>
-    <arg name="leaf_size" default="0.05"/>
+    <!-- pcd_downsample — PCD 点云体素降采样 -->
+    <!-- 依赖: PCL (VoxelGrid), uav_util/pcd_downsample_node -->
+    <!-- 用法: roslaunch uav_util pcd_downsample.launch pcd_path:=/path/to/map.pcd leaf_size:=0.1 -->
+    <!--
+      工作原理:
+        读取 PCD 文件 → pcl::VoxelGrid 体素栅格降采样 → 保存降采样后 PCD
+        leaf_size 越大, 点云越稀疏, 文件越小; leaf_size 越小, 保留细节越多
+    -->
 
-    <!-- Pass argument to node parameter -->
+    <!-- ===== 输入输出 ===== -->
+    <arg name="pcd_path" default=""/>      <!-- 输入 PCD 文件绝对路径 (必填) -->
+    <arg name="leaf_size" default="0.05"/> <!-- 体素栅格边长 [m] (VoxelGrid 立方体边长) -->
+
+    <!-- ===== 使用示例 ===== -->
+    <!-- 基础降采样: roslaunch uav_util pcd_downsample.launch pcd_path:=/home/user/map.pcd leaf_size:=0.1 -->
+    <!-- 粗降采样:   roslaunch uav_util pcd_downsample.launch pcd_path:=/home/user/map.pcd leaf_size:=0.3 -->
+    <!-- 细降采样:   roslaunch uav_util pcd_downsample.launch pcd_path:=/home/user/map.pcd leaf_size:=0.02 -->
+
+    <!-- ===== 节点 ===== -->
+    <!-- 读取 PCD 文件, 执行 VoxelGrid 降采样, 输出到同目录下 *_downsampled.pcd -->
     <node pkg="uav_util" type="pcd_downsample_node" name="pcd_downsample_node" output="screen">
         <param name="pcd_path" value="$(arg pcd_path)"/>
         <param name="leaf_size" value="$(arg leaf_size)"/>

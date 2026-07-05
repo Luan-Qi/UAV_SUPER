@@ -1,37 +1,73 @@
-<launch>
-    <arg name="octomap_topic" default="/octomap_full" />
-    <arg name="start_pose_topic" default="/start_pose" />
-    <arg name="goal_pose_topic" default="/goal_pose" />
-    <arg name="global_path_topic" default="/global_path_raw" />
-    <arg name="enable_obstacle_show" default="true" />
-    <arg name="inflater_size" default="3" />
+<!--
+ ============================================================================
+ astar_planner.launch — A* 3D 全局路径规划器启动文件
 
+ 功能:
+   启动 astar_planner_node，配置 OctoMap 输入、起点/终点话题、输出路径话题、
+   规划模式等参数。
+
+ 使用示例:
+   # 标准模式 (每次输入起点+终点)
+   roslaunch uav_planner astar_planner.launch
+
+   # 连续模式 (终点变起点)
+   roslaunch uav_planner astar_planner.launch planning_mode:=1
+
+   # 里程计模式 (当前位置作为起点)
+   roslaunch uav_planner astar_planner.launch planning_mode:=2 odometry_topic:=/mavros/local_position/odom
+ ============================================================================
+-->
+<launch>
+    <!-- ====== 话题配置 ====== -->
+    <arg name="octomap_topic"      default="/octomap_full" />     <!-- 八叉树占据地图输入 -->
+    <arg name="start_pose_topic"   default="/start_pose" />      <!-- 起点位姿输入 -->
+    <arg name="goal_pose_topic"    default="/goal_pose" />       <!-- 终点位姿输入 -->
+    <arg name="global_path_topic"  default="/global_path_raw" />  <!-- 规划路径输出 -->
+
+    <!-- ====== 功能开关 ====== -->
+    <arg name="enable_obstacle_show" default="true" />            <!-- 是否发布障碍物可视化 (PointCloud2) -->
+    <arg name="inflater_size"        default="3" />               <!-- 障碍物膨胀格数 (越大越保守) -->
+
+    <!-- ====== 规划模式 ====== -->
+    <!-- 0 = 标准模式: 每次分别输入起点和终点, 规划后清空两者 -->
+    <!-- 1 = 连续模式: 首次需起点+终点, 规划后终点自动成为下一次起点 -->
+    <!-- 2 = 里程计模式: 持续采集 odometry, 收到终点时以当前位姿作为起点 -->
+    <arg name="planning_mode" default="0" />
+    <!-- 模式2所需的里程计话题 (仅 planning_mode=2 时生效) -->
+    <arg name="odometry_topic" default="/odometry" />
+
+    <!-- ====== A* 规划器节点 ====== -->
     <node pkg="uav_planner" type="astar_planner_node" name="astar_planner_node" output="screen">
-        <param name="octomap_topic" value="$(arg octomap_topic)" />
-        <param name="start_pose_topic" value="$(arg start_pose_topic)" />
-        <param name="goal_pose_topic" value="$(arg goal_pose_topic)" />
-        <param name="global_path_topic" value="$(arg global_path_topic)" />
-        <param name="enable_obstacle_show" value="$(arg enable_obstacle_show)" />
-        <param name="inflater_size" value="$(arg inflater_size)" />
+        <param name="octomap_topic"         value="$(arg octomap_topic)" />
+        <param name="start_pose_topic"      value="$(arg start_pose_topic)" />
+        <param name="goal_pose_topic"       value="$(arg goal_pose_topic)" />
+        <param name="global_path_topic"     value="$(arg global_path_topic)" />
+        <param name="enable_obstacle_show"  value="$(arg enable_obstacle_show)" />
+        <param name="inflater_size"         value="$(arg inflater_size)" />
+        <param name="planning_mode"         value="$(arg planning_mode)" />
+        <param name="odometry_topic"        value="$(arg odometry_topic)" />
     </node>
 
+    <!-- ====== 可选: 路径坐标系变换节点 (按需启用) ====== -->
+    <!-- 将 map 系路径转换到 odom 系, 供本地控制器使用 -->
     <!--
-    <arg name="global_path_topic" default="/global_path" />
-    <arg name="local_path_topic" default="/local_path" />
-    <arg name="map_to_odom_topic" default="/map_to_odom" />
+    <arg name="global_path_topic"  default="/global_path" />
+    <arg name="local_path_topic"   default="/local_path" />
+    <arg name="map_to_odom_topic"  default="/map_to_odom" />
 
     <node pkg="uav_planner" type="transform_path" name="transform_path" output="screen">
-        <param name="global_path_topic" value="$(arg global_path_topic)" />
-        <param name="local_path_topic" value="$(arg local_path_topic)" />
-        <param name="map_to_odom_topic" value="$(arg map_to_odom_topic)" />
+        <param name="global_path_topic"  value="$(arg global_path_topic)" />
+        <param name="local_path_topic"   value="$(arg local_path_topic)" />
+        <param name="map_to_odom_topic"  value="$(arg map_to_odom_topic)" />
     </node>
     -->
 
+    <!-- ====== 可选: 手动发布起点/终点用于调试 ====== -->
     <!--
-    <node pkg="uav_px4_ctrl" type="pub_goal" name="pub_goal_1" output="screen" 
+    <node pkg="uav_px4_ctrl" type="pub_goal" name="pub_goal_1" output="screen"
         args="0.0 0.0 1 0 /start_pose" />
-    
-    <node pkg="uav_px4_ctrl" type="pub_goal" name="pub_goal_2" output="screen" 
+
+    <node pkg="uav_px4_ctrl" type="pub_goal" name="pub_goal_2" output="screen"
           args="53.0 -45.0 1 0 /move_base_simple/goal" />
     -->
 

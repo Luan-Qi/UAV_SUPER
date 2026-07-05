@@ -1,5 +1,23 @@
-const int nClusters = 15;
-float data[nClusters][3] = {
+/**
+ * @file labdata.h
+ * @brief KCF 跟踪器 Lab 颜色空间预计算聚类中心数据。
+ *
+ * @details
+ * 包含 15 个在 Lab 颜色空间上预计算的聚类中心（centroids），
+ * 用于 KCF 跟踪器的 Lab 颜色特征提取。
+ *
+ * 每个单元（cell）内的每个像素被分配到最近的聚类中心，
+ * 生成 15 维的稀疏颜色直方图特征，附加到 HOG 特征之后。
+ *
+ * 参考：
+ *   - M. Danelljan et al., "Adaptive Color Attributes for Real-Time Visual Tracking", CVPR 2014.
+ *   - J. F. Henriques et al., "High-Speed Tracking with Kernelized Correlation Filters", TPAMI 2015.
+ *
+ * 来源：KCF 开源实现 (Joao Faro, Christian Bailer, Joao F. Henriques)
+ */
+
+const int nClusters = 15;    ///< Lab 颜色聚类数
+float data[nClusters][3] = { ///< 预计算聚类中心 [L, a, b] (每通道取值范围: L∈[0,255], a∈[0,255], b∈[0,255])
 {161.317504, 127.223401, 128.609333},
 {142.922425, 128.666965, 127.532319},
 {67.879757, 127.721830, 135.903311},

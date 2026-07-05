@@ -1,7 +1,27 @@
 <launch>
+    <!-- AstraTracker — 奥比中光 Astra 深度相机目标跟踪 -->
+    <!-- 功能: 订阅 Astra 相机彩色图像，使用 OpenCV 跟踪算法对目标进行视觉跟踪 -->
+    <!-- 依赖: astra_camera 或 astrapro_camera 驱动, cv_bridge, OpenCV tracking -->
+    <!-- 用法: roslaunch uav_tracker AstraTracker.launch tracker_type:=KCF -->
+
+    <!-- ===== 跟踪器类型 ===== -->
     <arg name="tracker_type" default="color"
          doc="tracker type ['BOOSTING', 'MIL', 'KCF', 'TLD', 'MEDIANFLOW', 'MOSSE', 'CSRT', 'color']"/>
-	<!-- 距离相机的范围【0.4米，8米】，否则无效-->
+    <!-- 跟踪算法说明:
+         BOOSTING     — 基于 AdaBoost 的经典跟踪器
+         MIL          — 多实例学习跟踪器
+         KCF          — 核相关滤波跟踪器 (推荐, 速度快精度高)
+         TLD          — 跟踪-学习-检测长时跟踪器
+         MEDIANFLOW   — 光流中值跟踪器 (适合匀速运动)
+         MOSSE        — 最小输出平方误差和滤波器 (极快)
+         CSRT         — 通道与空间可靠性跟踪器 (精度高但较慢)
+         color        — 基于 HSV 颜色空间的颜色跟踪 -->
+
+    <!-- ===== 距离限制 ===== -->
+    <!-- 距离相机的范围 [0.4米, 8米]，否则无效 -->
+
+    <!-- ===== 节点 ===== -->
+    <!-- Astra_Tracker: 接收 Astra 相机图像，执行目标跟踪，发布跟踪结果 -->
     <node name="Astra_Tracker" pkg="uav_tracker" type="astra_Tracker.py" required="true" output="screen">
         <!-- 跟踪算法可选：'BOOSTING', 'MIL', 'KCF', 'TLD', 'MEDIANFLOW', 'GOTURN', 'color'-->
         <param name="tracker_type" type="string" value="$(arg tracker_type)"/>

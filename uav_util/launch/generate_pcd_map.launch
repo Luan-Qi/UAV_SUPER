@@ -1,66 +1,86 @@
 <launch>
+    <!-- generate_pcd_map — 生成参数化几何体模拟点云地图 (PCD) -->
+    <!-- 依赖: PCL, uav_util/pcd_map_generator_node -->
+    <!-- 用法: roslaunch uav_util generate_pcd_map.launch shape_type:=cube -->
+    <!-- 支持形状: cube(立方体) | sphere(球) | box_corridor(长方体走廊) | cylinder_corridor(圆柱走廊) -->
+    <!--
+      数据流:
+        ROS params (shape_type, size, pose, noise)
+               │
+               ▼
+        ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+        │ ShapeFactory  │───▶│ ShapeBase    │───▶│ PostProcessing│
+        │ (创建形状)     │    │ ::generate() │    │ (去质心/噪声)  │
+        └──────────────┘    └──────────────┘    └──────┬───────┘
+                                                       │
+                                          ┌────────────┴────────────┐
+                                          ▼                         ▼
+                                     PCD 文件保存          sensor_msgs::PointCloud2
+                                   (pcd_output_path)        (/generated_cloud)
+    -->
 
-    <!-- ===================== 基本选择 ===================== -->
-
-    <!-- 地图类型：cube / sphere / box_corridor / cylinder_corridor -->
+    <!-- ===== 地图类型选择 ===== -->
+    <!-- 形状类型: cube / sphere / box_corridor / cylinder_corridor -->
     <arg name="shape_type" default="cylinder_corridor"/>
-    <!-- 点云类型：xyz / xyzi / xyzrgb -->
-    <arg name="point_type" default="xyzi" />   
+    <!-- 点云类型: xyz / xyzi / xyzrgb -->
+    <arg name="point_type" default="xyzi" />
 
     <!-- PCD 文件输出路径 -->
     <arg name="pcd_output_path"
         default="$(env HOME)/generated_map.pcd"/>
 
-    <!-- ===================== 通用参数 ===================== -->
-
-    <!-- 点云分辨率（所有形状通用） -->
-    <arg name="resolution" default="0.05"/>
-
-    <!-- 壳体厚度（所有封闭体通用） -->
-    <arg name="thickness" default="0.1"/>
-    <arg name="publish_cloud" default="true"/>
+    <!-- ===== 通用参数 ===== -->
+    <arg name="resolution" default="0.05"/>   <!-- 点云分辨率 [m] -->
+    <arg name="thickness" default="0.1"/>    <!-- 壳体厚度 [m]（封闭体表面向内厚度） -->
+    <arg name="publish_cloud" default="true"/> <!-- 是否发布点云到 topic -->
 
     <!-- 点云特殊参数 -->
-    <arg name="intensity_dir" default="x"/>
-    <arg name="point_color" default=""/>
+    <arg name="intensity_dir" default="x"/>  <!-- 强度方向: x / y / z -->
+    <arg name="point_color" default=""/>     <!-- 点云颜色字符串 (空=使用默认色) -->
 
-    <!-- ===================== 尺寸参数 ===================== -->
-    <!-- 立方体 / 长方体走廊 (XYZ) -->
-    <arg name="length" default="180.0"/>
-    <arg name="width"  default="50.0"/>
-    <arg name="height" default="6.0"/>
+    <!-- ===== 尺寸参数 ===== -->
+    <!-- 立方体 / 长方体走廊 (shape_type=cube / box_corridor) -->
+    <arg name="length" default="180.0"/>  <!-- X 方向长度 [m] -->
+    <arg name="width"  default="50.0"/>   <!-- Y 方向宽度 [m] -->
+    <arg name="height" default="6.0"/>   <!-- Z 方向高度 [m] -->
 
-    <!-- 球体 / 圆柱走廊 -->
-    <arg name="radius" default="3.0"/>
+    <!-- 球体 / 圆柱走廊 (shape_type=sphere / cylinder_corridor) -->
+    <arg name="radius" default="3.0"/>   <!-- 半径 [m] -->
 
-    <!-- 坐标系原点 -->
-    <arg name="center_x" default="-5.0"/>
-    <arg name="center_y" default="0.0"/>
-    <arg name="center_z" default="3.0"/>
+    <!-- ===== 坐标系 ===== -->
+    <arg name="center_x" default="-5.0"/>  <!-- 中心 X [m] -->
+    <arg name="center_y" default="0.0"/>   <!-- 中心 Y [m] -->
+    <arg name="center_z" default="3.0"/>   <!-- 中心 Z [m] -->
 
-    <!-- 点云整体姿态（单位：rad）（先旋转，再平移） -->
-    <arg name="roll"  default="0.0" />
-    <arg name="pitch" default="0.0" />
-    <arg name="yaw"   default="0.0" />
+    <!-- 点云整体姿态 (先旋转 RPY，再平移 center) -->
+    <arg name="roll"  default="0.0" />  <!-- [rad] -->
+    <arg name="pitch" default="0.0" />  <!-- [rad] -->
+    <arg name="yaw"   default="0.0" />  <!-- [rad] -->
 
-    <!-- ===================== 噪声参数 ===================== -->
-    <!-- 噪声标准差 -->
-    <arg name="enable_noise" default="true"/>
-    <arg name="noise_std" default="0.01"/>
+    <!-- ===== 噪声参数 ===== -->
+    <arg name="enable_noise" default="true"/>      <!-- 是否添加高斯噪声 -->
+    <arg name="noise_std" default="0.01"/>        <!-- 噪声标准差 [m] -->
 
-    <!-- 稀疏点 -->
-    <arg name="enable_sparse" default="true"/>
-    <arg name="sparse_keep_ratio" default="0.6"/>
+    <!-- 稀疏点 (模拟遮挡/采样不均) -->
+    <arg name="enable_sparse" default="true"/>     <!-- 是否稀疏化 -->
+    <arg name="sparse_keep_ratio" default="0.6"/>  <!-- 保留比例 (0~1) -->
 
-    <!-- 孔洞 -->
-    <arg name="enable_hole" default="false"/>
-    <arg name="hole_x" default="10.0"/>
-    <arg name="hole_y" default="0.0"/>
-    <arg name="hole_z" default="0.0"/>
-    <arg name="hole_radius" default="1.5"/>
+    <!-- 孔洞 (模拟数据缺失) -->
+    <arg name="enable_hole" default="false"/>      <!-- 是否开孔 -->
+    <arg name="hole_x" default="10.0"/>           <!-- 孔洞中心 X [m] -->
+    <arg name="hole_y" default="0.0"/>            <!-- 孔洞中心 Y [m] -->
+    <arg name="hole_z" default="0.0"/>            <!-- 孔洞中心 Z [m] -->
+    <arg name="hole_radius" default="1.5"/>       <!-- 孔洞半径 [m] -->
 
-    <!-- ===================== 节点 ===================== -->
+    <!-- ===== 使用示例 ===== -->
+    <!-- 立方体: roslaunch uav_util generate_pcd_map.launch shape_type:=cube length:=10 width:=10 height:=5 -->
+    <!-- 球体:   roslaunch uav_util generate_pcd_map.launch shape_type:=sphere radius:=5 -->
+    <!-- 长方体走廊: roslaunch uav_util generate_pcd_map.launch shape_type:=box_corridor length:=100 width:=20 height:=6 -->
+    <!-- 圆柱走廊: roslaunch uav_util generate_pcd_map.launch shape_type:=cylinder_corridor radius:=3 length:=200 -->
+    <!-- 带噪声和孔洞: roslaunch uav_util generate_pcd_map.launch shape_type:=cube enable_noise:=true enable_hole:=true -->
 
+    <!-- ===== 节点 ===== -->
+    <!-- 根据参数生成 PCD 点云并保存到文件, 同时发布到 /generated_cloud 话题 -->
     <node pkg="uav_util"
           type="pcd_map_generator_node"
           name="pcd_map_generator"

@@ -1,5 +1,33 @@
-// fast_lio_localization.cpp
-// 编译: 见下方 CMakeLists.txt / package.xml
+/**
+ * @file global_localization.cpp
+ * @brief 基于 FastGICP 的全局 scan-to-map 定位节点。
+ *
+ * @details
+ * 核心功能：
+ *   1. 接收全局地图点云 (PCD) 和实时激光扫描点云
+ *   2. 使用 FastGICP (可降级为 PCL ICP) 进行 scan-to-map 配准
+ *   3. 在 FOV 范围内裁剪地图子图以提高配准效率
+ *   4. 多尺度配准：粗配准 (scale=5) → 精配准 (scale=1)
+ *   5. 发布 map→odom 变换 (nav_msgs::Odometry)
+ *   6. 支持 /initialpose 话题初始化初始位姿
+ *
+ * 算法流水线：
+ *   global_map → cropGlobalMapInFOV → registrationAtScale(coarse, scale=5)
+ *     → registrationAtScale(fine, scale=1) → 收敛判定 → 发布 /map_to_odom
+ *
+ * 坐标系：
+ *   - map (全局固定坐标系)
+ *   - odom (里程计漂移坐标系)
+ *   - camera_init / base_link (机体坐标系)
+ *
+ * 节点名：fast_lio_localization (历史命名，实际使用 FastGICP 算法)
+ * 使用：
+ *   rosrun uav_location fast_lio_localization
+ *   roslaunch uav_location global_planner_in_sim.launch
+ *
+ * @note 原 Python 参考实现的重写 C++ 版本。
+ */
+
 #include <ros/ros.h>
 #include <thread>
 #include <mutex>
@@ -22,47 +50,65 @@
 
 #include <fast_gicp/gicp/fast_gicp.hpp>
 #include <fast_gicp/gicp/fast_vgicp.hpp>
-#define FAST_ICP_ENABLE
+#define FAST_ICP_ENABLE    ///< 启用 FastGICP 加速配准；注释掉回退至 PCL ICP
 
 #include <tf/transform_datatypes.h>
 #include <tf/LinearMath/Transform.h>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+// ============================================================================
+// 类型别名与全局变量
+// ============================================================================
+
 using PointT = pcl::PointXYZ;
 using CloudT = pcl::PointCloud<PointT>;
 
+/// @brief 全局数据互斥锁，保护以下所有共享变量
 std::mutex mutex_;
 
-CloudT::Ptr global_map (new CloudT);
-CloudT::Ptr cur_scan (new CloudT);
-nav_msgs::Odometry::ConstPtr cur_odom_msg;
-std::atomic<bool> got_global_map(false);
-std::atomic<bool> got_scan(false);
-std::atomic<bool> initialized(false);
-Eigen::Matrix4f initial;
+CloudT::Ptr global_map (new CloudT);       ///< 全局地图点云
+CloudT::Ptr cur_scan (new CloudT);         ///< 当前帧扫描点云
+nav_msgs::Odometry::ConstPtr cur_odom_msg; ///< 最新里程计消息
+std::atomic<bool> got_global_map(false);   ///< 是否已接收全局地图
+std::atomic<bool> got_scan(false);         ///< 是否已接收首次扫描
+std::atomic<bool> initialized(false);      ///< 是否已接收初始位姿
+Eigen::Matrix4f initial;                   ///< 初始位姿矩阵 (map→odom)
 
+// ============================================================================
+// 可配置参数 (由 ROS param 加载)
+// ============================================================================
 
-int icp_max_iter = 20;
+int    icp_max_iter       = 20;      ///< ICP 最大迭代次数
+double MAP_VOXEL_SIZE     = 0.4;     ///< 地图下采样体素尺寸 [m]
+double SCAN_VOXEL_SIZE    = 0.1;     ///< 扫描下采样体素尺寸 [m]
+double FREQ_LOCALIZATION  = 0.5;     ///< 全局定位发布频率 [Hz]
+double LOCALIZATION_TH    = 0.95;    ///< ICP 伪 fitness 收敛阈值 (0~1，越大越准)
+double FOV                = 6.28;    ///< LiDAR 水平视场角 [rad] (360°=6.28)
+double FOV_FAR            = 50.0;    ///< FOV 内最大有效距离 [m]
 
+// ============================================================================
+// ROS 发布器/订阅器
+// ============================================================================
 
-double MAP_VOXEL_SIZE = 0.4;
-double SCAN_VOXEL_SIZE = 0.1;
-double FREQ_LOCALIZATION = 0.5; // Global localization frequency (HZ)
-double LOCALIZATION_TH = 0.95;  // The threshold of global localization, only those scan2map-matching with higher fitness than LOCALIZATION_TH will be taken
-double FOV = 6.28;              // FOV(rad), modify this according to your LiDAR type
-double FOV_FAR = 50.0;          // The farthest distance(meters) within FOV
+ros::Publisher pub_pc_in_map;        ///< /cur_scan_in_map — 当前扫描在 map 系的可视化
+ros::Publisher pub_submap;           ///< /submap — 当前配准用的局部子图可视化
+ros::Publisher pub_map_to_odom;      ///< /map_to_odom — 全局定位结果
 
-ros::Publisher pub_pc_in_map;
-ros::Publisher pub_submap;
-ros::Publisher pub_map_to_odom;
+ros::Subscriber sub_cloud_registered; ///< /cloud_registered — 输入激光点云
+ros::Subscriber sub_odom;            ///< /Odometry — 输入局部里程计
+ros::Subscriber sub_map;             ///< /map — 输入全局地图
+ros::Subscriber sub_initialpose;     ///< /initialpose — 初始位姿估计
 
-ros::Subscriber sub_cloud_registered;
-ros::Subscriber sub_odom;
-ros::Subscriber sub_map;
-ros::Subscriber sub_initialpose;
+// ============================================================================
+// 工具函数：位姿消息 ↔ 变换矩阵
+// ============================================================================
 
-// helper: convert PoseWithCovarianceStamped -> Eigen::Matrix4f
+/**
+ * @brief 将 geometry_msgs::Pose 转换为 Eigen::Matrix4f。
+ * @param p 输入位姿消息
+ * @return 4×4 齐次变换矩阵
+ */
 Eigen::Matrix4f poseMsgToMatrix(const geometry_msgs::Pose &p)
 {
     Eigen::Quaternionf q(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z);
@@ -84,7 +130,16 @@ Eigen::Matrix4f odomToMatrix(const nav_msgs::Odometry::ConstPtr &msg)
     return poseMsgToMatrix(msg->pose.pose);
 }
 
-// voxel downsample helper
+// ============================================================================
+// 点云处理工具
+// ============================================================================
+
+/**
+ * @brief VoxelGrid 体素下采样。
+ * @param input 输入点云
+ * @param leaf  体素边长 [m]
+ * @return 下采样后的点云
+ */
 CloudT::Ptr voxelDownSample(const CloudT::Ptr &input, double leaf)
 {
     CloudT::Ptr out(new CloudT);
@@ -95,18 +150,29 @@ CloudT::Ptr voxelDownSample(const CloudT::Ptr &input, double leaf)
     return out;
 }
 
-// registration at scale: use PCL ICP point-to-point, returns transformation and fitness
+/**
+ * @brief 多尺度 ICP 配准。
+ *
+ * 在给定 scale 下同时对扫描和地图降采样后进行 ICP 配准。
+ * scale 越大降采样越激进，速度越快但精度越低。
+ *
+ * @param scan    源点云（激光扫描）
+ * @param map     目标点云（地图子图）
+ * @param initial 初始猜测变换矩阵
+ * @param scale   降采样尺度因子 (>1 = 更大的体素)
+ * @return (最终变换矩阵, 伪_fitness) — fitness 越高越好 (1/(1+fitness_mse))
+ */
 std::pair<Eigen::Matrix4f, double> registrationAtScale(const CloudT::Ptr &scan,
                                                        const CloudT::Ptr &map,
                                                        const Eigen::Matrix4f &initial,
                                                        double scale)
 {
-    // downsample
+    // 按 scales 下采样
     double scan_leaf = SCAN_VOXEL_SIZE * scale;
-    double map_leaf = MAP_VOXEL_SIZE * scale;
+    double map_leaf  = MAP_VOXEL_SIZE * scale;
 
     CloudT::Ptr scan_down = voxelDownSample(scan, scan_leaf);
-    CloudT::Ptr map_down = voxelDownSample(map, map_leaf);
+    CloudT::Ptr map_down  = voxelDownSample(map, map_leaf);
 
 #ifndef FAST_ICP_ENABLE
     pcl::IterativeClosestPoint<PointT, PointT> icp;
@@ -118,32 +184,39 @@ std::pair<Eigen::Matrix4f, double> registrationAtScale(const CloudT::Ptr &scan,
     icp.setInputSource(scan_down);
     icp.setInputTarget(map_down);
     icp.setMaximumIterations(icp_max_iter);
-    icp.setMaxCorrespondenceDistance(1.0 * scale + 0.001); // tune if needed
+    icp.setMaxCorrespondenceDistance(1.0 * scale + 0.001);
 
     CloudT aligned;
     icp.align(aligned, initial.cast<float>());
 
     Eigen::Matrix4f final_tf = icp.getFinalTransformation();
-    double fitness = icp.hasConverged() ? icp.getFitnessScore() : 1e9; // lower is better for PCL getFitnessScore
+    double fitness = icp.hasConverged() ? icp.getFitnessScore() : 1e9;
 
-    // NOTE: PCL's getFitnessScore is a distance-based metric (lower better).
-    // In python code fitness was high-is-better. To mimic threshold semantics we will invert:
-    // define "pseudo-fitness" = exp(-fitness) so that higher is better, but to keep simple:
-    // We'll map: pseudo_fitness = 1.0 / (1.0 + fitness)
+    // PCL getFitnessScore 是距离度量 (越低越好)。
+    // 原始 Python 代码中 fitness 高=好，此处映射: pseudo_fitness = 1/(1+fitness)
     double pseudo_fitness = 1.0 / (1.0 + fitness);
 
     return std::make_pair(final_tf, pseudo_fitness);
 }
 
-// crop global map in FOV relative to a pose_estimation (T_map_to_odom) and current odom (odom in msg form)
+/**
+ * @brief 在 FOV 范围内裁剪全局地图。
+ *
+ * 根据当前位姿估计和里程计，将全局地图投影到机体坐标系，
+ * 仅保留传感器 FOV 内的地图点，减少配准计算量。
+ *
+ * @param global_map_in  完整全局地图
+ * @param pose_estimation 当前 map→odom 变换估计
+ * @param cur_odom        当前局部里程计
+ * @return FOV 内的局部子图
+ */
 CloudT::Ptr cropGlobalMapInFOV(const CloudT::Ptr &global_map_in,
                                const Eigen::Matrix4f &pose_estimation,
                                const nav_msgs::Odometry::ConstPtr &cur_odom)
 {
-    // convert odom pose to transform from odom -> base_link (we assume cur_odom is odom->base)
+    // T_odom_to_base: 局部里程计 (odom → base_link)
     Eigen::Matrix4f T_odom_to_base = odomToMatrix(cur_odom);
-    // T_map_to_base = pose_estimation * T_odom_to_base    (here pose_estimation is map->odom or map->odom?)
-    // In Python code, they computed T_map_to_base_link = pose_estimation * T_odom_to_base_link
+    // T_map_to_base = map→odom × odom→base
     Eigen::Matrix4f T_map_to_base = pose_estimation * T_odom_to_base;
     Eigen::Matrix4f T_base_to_map = T_map_to_base.inverse();
 
@@ -152,17 +225,18 @@ CloudT::Ptr cropGlobalMapInFOV(const CloudT::Ptr &global_map_in,
 
     for (const auto &pt : global_map_in->points) {
         Eigen::Vector4f p_map(pt.x, pt.y, pt.z, 1.0f);
-        Eigen::Vector4f p_base = T_base_to_map * p_map; // point represented in base_link frame
+        Eigen::Vector4f p_base = T_base_to_map * p_map; // 点转到机体坐标系
         float x = p_base.x();
         float y = p_base.y();
         float z = p_base.z();
 
         bool keep = false;
         if (FOV > 3.14) {
-            // ring lidar: only distance filter but original python also checks angle < FOV/2; here keep similar
+            // 360° LiDAR: 仅距离滤波，角度 < FOV/2
             float ang = std::abs(std::atan2(y, x));
             if ((x*x + y*y) <= (FOV_FAR*FOV_FAR) && ang < (FOV/2.0 + 1e-6)) keep = true;
         } else {
+            // 前向 LiDAR: 仅保留前方 (x>0) + 距离 + 角度
             float ang = std::abs(std::atan2(y, x));
             float r = std::sqrt(x*x + y*y);
             if ((x > 0) && (r < FOV_FAR) && ang < (FOV/2.0 + 1e-6)) keep = true;
@@ -177,50 +251,60 @@ CloudT::Ptr cropGlobalMapInFOV(const CloudT::Ptr &global_map_in,
     return out;
 }
 
-// Crop point cloud by distance in XY plane
-CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud, 
-                                     const nav_msgs::Odometry::ConstPtr& center_point, 
-                                     double radius) 
+/**
+ * @brief 按 XY 平面距离裁剪点云。
+ * @param input_cloud 输入点云
+ * @param center_point 中心点 (odom 消息)
+ * @param radius     裁剪半径 [m]
+ * @return 裁剪后的点云
+ */
+CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud,
+                                     const nav_msgs::Odometry::ConstPtr& center_point,
+                                     double radius)
 {
     CloudT::Ptr filtered_cloud(new CloudT);
     filtered_cloud->header = input_cloud->header;
     filtered_cloud->is_dense = input_cloud->is_dense;
-    
+
     for (const auto& point : input_cloud->points) {
-        // Calculate distance in XY plane from the point to the center point
         double dx = point.x - center_point->pose.pose.position.x;
         double dy = point.y - center_point->pose.pose.position.y;
         double distance = sqrt(dx * dx + dy * dy);
-        
-        // Keep the point if it is within the specified radius
+
         if (distance <= radius) {
             filtered_cloud->points.push_back(point);
         }
     }
-    
+
     return filtered_cloud;
 }
 
-// Crop point cloud by distance in XY plane with transformation
-CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud, 
+/**
+ * @brief 按 XY 距离裁剪并变换点云到 map 坐标系。
+ * @param input_cloud  输入点云 (在 odom 系)
+ * @param pose_estimation map→odom 变换估计
+ * @param center_point 中心点
+ * @param radius      裁剪半径 [m]
+ * @return 裁剪并变换后的点云 (在 map 系)
+ */
+CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud,
                                      const Eigen::Matrix4f &pose_estimation,
-                                     const nav_msgs::Odometry::ConstPtr& center_point, 
-                                     double radius) 
+                                     const nav_msgs::Odometry::ConstPtr& center_point,
+                                     double radius)
 {
     CloudT::Ptr filtered_cloud(new CloudT);
     filtered_cloud->header = input_cloud->header;
     filtered_cloud->is_dense = input_cloud->is_dense;
-        
-    for (const auto& point : input_cloud->points) 
+
+    for (const auto& point : input_cloud->points)
     {
-        // Calculate distance in XY plane from the point to the center point
         double dx = point.x - center_point->pose.pose.position.x;
         double dy = point.y - center_point->pose.pose.position.y;
         double distance = std::sqrt(dx * dx + dy * dy);
 
-        if (distance <= radius) 
+        if (distance <= radius)
         {
-            // Transform the point to the new coordinate system using pose estimation matrix
+            // 将 odom 系点变换到 map 坐标系
             Eigen::Vector4f pt(point.x, point.y, point.z, 1.0f);
             Eigen::Vector4f pt_transformed = pose_estimation * pt;
 
@@ -232,11 +316,16 @@ CloudT::Ptr cropPointCloudByDistance(const CloudT::Ptr& input_cloud,
             filtered_cloud->points.push_back(new_pt);
         }
     }
-    
+
     return filtered_cloud;
 }
 
-// publish pcl cloud (XYZ) as sensor_msgs::PointCloud2 with header
+/**
+ * @brief 发布 PCL 点云为 ROS sensor_msgs::PointCloud2 消息。
+ * @param cloud  输入点云
+ * @param header ROS 消息头 (时间戳 + frame_id)
+ * @param pub    发布器
+ */
 void publishPointCloud(const CloudT::Ptr &cloud, const std_msgs::Header &header, ros::Publisher &pub)
 {
     sensor_msgs::PointCloud2 msg;
@@ -245,7 +334,22 @@ void publishPointCloud(const CloudT::Ptr &cloud, const std_msgs::Header &header,
     pub.publish(msg);
 }
 
-// global localization: several steps, returns true if successful and publishes /map_to_odom
+// ============================================================================
+// 全局定位核心算法
+// ============================================================================
+
+/**
+ * @brief 执行一次全局定位迭代。
+ *
+ * 流程：
+ *   1. 在 FOV 内裁剪局部子图
+ *   2. 粗配准 (scale=5，大降采样，快速收敛)
+ *   3. 精配准 (scale=1，小降采样，精确定位)
+ *   4. 收敛判定 → 发布 /map_to_odom
+ *
+ * @param[in,out] T_map_to_odom 当前 map→odom 变换（入参为初值，出参为更新值）
+ * @return true 定位成功，false 定位失败
+ */
 bool globalLocalization(Eigen::Matrix4f &T_map_to_odom)
 {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -256,24 +360,23 @@ bool globalLocalization(Eigen::Matrix4f &T_map_to_odom)
 
     ROS_INFO_THROTTLE(60.0, "[global] Global localization by scan-to-map matching......");
 
-    // crop map in FOV relative to current odom
+    // 1. 裁剪 FOV 子图
     CloudT::Ptr submap = cropGlobalMapInFOV(global_map, T_map_to_odom, cur_odom_msg);
     if (submap->empty()) {
         ROS_WARN("[global] submap empty after cropping");
         return false;
     }
 
-    // publish submap sparse for visualization (downsample heavier)
+    // 发布子图可视化
     CloudT::Ptr submap_vis = voxelDownSample(submap, MAP_VOXEL_SIZE);
     std_msgs::Header hdr;
     hdr.stamp = ros::Time::now();
     hdr.frame_id = "map";
     publishPointCloud(submap_vis, hdr, pub_submap);
 
-    // prepare scan (already in cur_scan in odom frame? In original python, they used cur_scan as given)
     CloudT::Ptr scan_copy(new CloudT(*cur_scan));
 
-    // coarse registration (scale=5)
+    // 2. 粗配准 (scale=5，激进降采样，快速收敛到大体位置)
     auto coarse = registrationAtScale(scan_copy, submap, T_map_to_odom, 5.0);
     Eigen::Matrix4f tf_coarse = coarse.first;
     double fitness_coarse = coarse.second;
@@ -284,17 +387,16 @@ bool globalLocalization(Eigen::Matrix4f &T_map_to_odom)
         return false;
     }
 
-    // fine registration (scale=1)
+    // 3. 精配准 (scale=1，精细降采样，提高精度)
     auto fine = registrationAtScale(scan_copy, submap, tf_coarse, 1.0);
     Eigen::Matrix4f tf_fine = fine.first;
     double fitness = fine.second;
 
+    // 4. 收敛判定
     if (fitness > LOCALIZATION_TH) {
-        //ROS_INFO("[global] Localization fitness (pseudo) = %.3f", fitness);
-        // update map->odom
         T_map_to_odom = tf_fine;
 
-        // publish Odometry message as map_to_odom
+        // 发布 Odometry 类型的 map_to_odom 消息
         nav_msgs::Odometry map_to_odom;
         Eigen::Vector3f t = T_map_to_odom.block<3,1>(0,3);
         Eigen::Matrix3f R = T_map_to_odom.block<3,3>(0,0);
@@ -318,24 +420,28 @@ bool globalLocalization(Eigen::Matrix4f &T_map_to_odom)
     }
 }
 
-// callbacks
+// ============================================================================
+// ROS 回调函数
+// ============================================================================
+
+/// @brief 保存最新局部里程计消息
 void cbSaveCurOdom(const nav_msgs::Odometry::ConstPtr &odom_msg)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     cur_odom_msg = odom_msg;
 }
 
+/// @brief 保存并预处理当前激光扫描
 void cbSaveCurScan(const sensor_msgs::PointCloud2::ConstPtr &pc_msg)
 {
-    // similar to python: assume points already in odom or camera_init frame
     std::lock_guard<std::mutex> lock(mutex_);
     CloudT::Ptr tmp(new CloudT);
     pcl::fromROSMsg(*pc_msg, *tmp);
-    // store as cur_scan (XYZ)
+    // 按 FOV_FAR 距离裁剪
     cur_scan = cropPointCloudByDistance(tmp, cur_odom_msg, FOV_FAR);
     got_scan = true;
 
-    // publish pc_in_map equivalent - here we just reuse the incoming message header but set frame to camera_init
+    // 发布当前扫描在 camera_init 系的可视化
     CloudT::Ptr scan_vis = voxelDownSample(cur_scan, SCAN_VOXEL_SIZE);
     std_msgs::Header hdr;
     hdr.stamp = ros::Time::now();
@@ -343,19 +449,18 @@ void cbSaveCurScan(const sensor_msgs::PointCloud2::ConstPtr &pc_msg)
     publishPointCloud(scan_vis, hdr, pub_pc_in_map);
 }
 
-// initialize global map callback or initial message
+/// @brief 接收全局地图 (仅接收一次)
 void cbInitGlobalMap(const sensor_msgs::PointCloud2::ConstPtr &pc_msg)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     CloudT::Ptr tmp(new CloudT);
     pcl::fromROSMsg(*pc_msg, *tmp);
-    // downsample
     global_map = voxelDownSample(tmp, MAP_VOXEL_SIZE);
     got_global_map = true;
     ROS_INFO("[global] Global map received, points: %zu", global_map->size());
 }
 
-// initial pose callback: user might publish /initialpose -> try to initialize
+/// @brief 接收用户发布的初始位姿 (/initialpose)
 void cbInitialPose(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &pose_msg)
 {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -364,18 +469,31 @@ void cbInitialPose(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &pos
     initialized = true;
 }
 
-// thread to run periodic localization (uses a stored T_map_to_odom)
+// ============================================================================
+// 定位线程
+// ============================================================================
+
+/**
+ * @brief 独立定位线程，按固定频率执行全局定位。
+ *
+ * 阻塞直到收到 /initialpose，此后周期性调用 globalLocalization()，
+ * 以 FREQ_LOCALIZATION 频率更新 map→odom 变换。
+ */
 void threadLocalization()
 {
     Eigen::Matrix4f T_map_to_odom = Eigen::Matrix4f::Identity();
     ros::Rate rate(FREQ_LOCALIZATION);
+
+    // 等待初始位姿
     while (ros::ok() && !initialized)
     {
         ROS_WARN_THROTTLE(5.0, "[global] Waiting for initialization...");
         rate.sleep();
     }
     T_map_to_odom = initial;
-    while (ros::ok()) 
+
+    // 主循环：周期性全局定位
+    while (ros::ok())
     {
         bool ok = globalLocalization(T_map_to_odom);
         (void)ok;
@@ -383,12 +501,17 @@ void threadLocalization()
     }
 }
 
+// ============================================================================
+// 主函数
+// ============================================================================
+
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "fast_lio_localization");
     ros::NodeHandle nh("~");
     ROS_INFO("[global] Localization Node Inited...");
 
+    // ---- 加载参数 ----
     std::string map_in_topic;
     nh.param<int>("icp_max_iter", icp_max_iter, 20);
     nh.param<double>("map_voxel_size", MAP_VOXEL_SIZE, MAP_VOXEL_SIZE);
@@ -399,16 +522,18 @@ int main(int argc, char** argv)
     nh.param<double>("fov_far", FOV_FAR, FOV_FAR);
     nh.param<std::string>("map_in_topic", map_in_topic, "/map");
 
-    pub_pc_in_map = nh.advertise<sensor_msgs::PointCloud2>("/cur_scan_in_map", 10);
-    pub_submap = nh.advertise<sensor_msgs::PointCloud2>("/submap", 10);
+    // ---- 发布器 ----
+    pub_pc_in_map   = nh.advertise<sensor_msgs::PointCloud2>("/cur_scan_in_map", 10);
+    pub_submap      = nh.advertise<sensor_msgs::PointCloud2>("/submap", 10);
     pub_map_to_odom = nh.advertise<nav_msgs::Odometry>("/map_to_odom", 10);
 
+    // ---- 订阅器 ----
     sub_cloud_registered = nh.subscribe("/cloud_registered", 5, cbSaveCurScan);
-    sub_odom = nh.subscribe("/Odometry", 10, cbSaveCurOdom);
-    sub_map = nh.subscribe(map_in_topic, 5, cbInitGlobalMap);
-    sub_initialpose = nh.subscribe("/initialpose", 5, cbInitialPose);
+    sub_odom             = nh.subscribe("/Odometry", 10, cbSaveCurOdom);
+    sub_map              = nh.subscribe(map_in_topic, 5, cbInitGlobalMap);
+    sub_initialpose      = nh.subscribe("/initialpose", 5, cbInitialPose);
 
-    // Wait until map is received (blocking similar to rospy.wait_for_message)
+    // ---- 等待全局地图加载 ----
     ROS_WARN("[global] Waiting for global map......");
     ros::Rate wait_rate(5.0);
     while (ros::ok() && !got_global_map) {
@@ -416,6 +541,7 @@ int main(int argc, char** argv)
         wait_rate.sleep();
     }
 
+    // ---- 启动定位线程 ----
     std::thread th(threadLocalization);
     th.detach();
 

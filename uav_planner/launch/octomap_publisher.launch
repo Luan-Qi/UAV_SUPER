@@ -1,19 +1,46 @@
-<launch>
-    <arg name="pcd_file" default="/home/orangepi/Documents/rospcd/dianguang-floor3-2-good_downsampled.pcd"/>
-    <arg name="pcd_frame_id" default="map"/>
-    <arg name="pcd_topic" default="/map"/>
+<!--
+ ============================================================================
+ octomap_publisher.launch — PCD 文件 → OctoMap 离线地图发布
 
-    <node pkg="pcl_ros" type="pcd_to_pointcloud" name="pcd_to_pointcloud" output="screen" 
+ 功能:
+   1. 使用 pcl_ros 的 pcd_to_pointcloud 节点将 PCD 点云文件发布为 PointCloud2
+   2. 使用 octomap_server 将 PointCloud2 转换为 OctoMap (八叉树占据地图)
+   3. OctoMap 供 astar_planner_node 作为障碍物地图使用
+
+ 使用示例:
+   roslaunch uav_planner octomap_publisher.launch pcd_file:=/path/to/your/map.pcd
+
+ 注意:
+   - PCD 文件必须是 dense 格式 (不含 NaN)
+   - 建议预先对 PCD 做降采样以加速 OctoMap 构建
+   - frame_id 设为 "map" 以与规划器坐标系对齐
+ ============================================================================
+-->
+<launch>
+    <!-- ====== PCD 文件路径 ====== -->
+    <arg name="pcd_file"     default="/home/orangepi/Documents/rospcd/dianguang-floor3-2-good_downsampled.pcd"/>
+    <!-- ====== 坐标系 ====== -->
+    <arg name="pcd_frame_id" default="map"/>
+    <!-- ====== 点云发布话题 ====== -->
+    <arg name="pcd_topic"    default="/map"/>
+
+    <!-- ====== 节点1: PCD → PointCloud2 ====== -->
+    <!-- rate=5Hz: 以 5Hz 频率重复发布 (确保后续节点能收到) -->
+    <!-- latch=true: 新订阅者立即收到最后一条消息 -->
+    <node pkg="pcl_ros" type="pcd_to_pointcloud" name="pcd_to_pointcloud" output="screen"
           args="$(arg pcd_file) _frame_id:=$(arg pcd_frame_id) _rate:=5.0 _latch:=true cloud_pcd:=$(arg pcd_topic)"/>
 
+    <!-- ====== 节点2: PointCloud2 → OctoMap ====== -->
     <node pkg="octomap_server" type="octomap_server_node" name="octomap_server">
+        <!-- 八叉树分辨率 (m): 越小越精细但计算量越大 -->
         <param name="resolution" value="0.2" />
-        <!-- fixed map frame (set to 'map' if SLAM or localization running!) -->
+        <!-- 固定地图坐标系 -->
         <param name="frame_id" type="string" value="map" />
-        <!-- maximum range to integrate (speedup!) -->
+        <!-- 传感器最大量程 (m): 超过此距离的点被忽略, 设为较大值以保留所有点 -->
         <param name="sensor_model/max_range" value="100.0" />
-        <!-- data source to integrate (PointCloud2) -->
+        <!-- 将 PCD 点云话题映射到 octomap_server 的输入 -->
         <remap from="cloud_in" to="$(arg pcd_topic)" />
+        <!-- 点云高度裁剪: 限制 Z 轴范围以减少无关障碍物 -->
         <param name="pointcloud_max_z" value="10.0" />
         <param name="pointcloud_min_z" value="-10.0" />
     </node>

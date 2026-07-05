@@ -1,20 +1,48 @@
+<!--
+ ============================================================================
+ planner_path_simplify.launch — 路径简化节点启动文件
+
+ 功能:
+   对 A* 规划器输出的稠密路径 (/global_path_raw) 进行简化, 减少路径点数,
+   输出简化后的路径 (/global_path)。
+
+ 可选算法:
+   - greedy (默认): 贪心碰撞感知简化
+     利用障碍物点云进行碰撞检测, 跳过可直达的点, 保证简化后路径仍然安全
+     需要 astar_planner_node 发布 obstacle_cloud
+
+   - dp: Douglas-Peucker 3D 简化
+     纯几何简化, 不依赖障碍物信息, 通过点到直线距离阈值控制简化程度
+
+ 使用示例:
+   # 贪心简化 (推荐, 安全性高)
+   roslaunch uav_planner planner_path_simplify.launch planner_type:=greedy
+
+   # DP 简化 (快速, 纯几何)
+   roslaunch uav_planner planner_path_simplify.launch planner_type:=dp
+ ============================================================================
+-->
 <launch>
+    <!-- 简化算法选择: "greedy" (贪心+碰撞检测) | "dp" (Douglas-Peucker) -->
     <arg name="planner_type" default="greedy" />
 
+    <!-- ====== DP 简化 (Douglas-Peucker 3D) ====== -->
     <node name="dp_path_simplify" pkg="uav_planner" type="dp_path_simplify" output="screen"
           if="$(eval arg('planner_type') == 'dp')">
-        <param name="input_topic" value="/global_path_raw"/>
-        <param name="output_topic" value="/global_path"/>
-        <param name="simplification_threshold" value="0.45"/>
-        <param name="min_segment_length" value="0.5"/>
+        <param name="input_topic"              value="/global_path_raw"/>   <!-- 输入: 原始稠密路径 -->
+        <param name="output_topic"             value="/global_path"/>       <!-- 输出: 简化后路径 -->
+        <param name="simplification_threshold" value="0.45"/>               <!-- DP 距离阈值 (m): 越大越简化 -->
+        <param name="min_segment_length"       value="0.5"/>                <!-- 最短线段长度 (m): 防止退化 -->
     </node>
 
+    <!-- ====== Greedy 简化 (贪心+碰撞检测) ====== -->
     <node name="greedy_path_simplify" pkg="uav_planner" type="greedy_path_simplify" output="screen"
           if="$(eval arg('planner_type') == 'greedy')">
-        <param name="input_topic" value="/global_path_raw" />
-        <param name="map_topic" value="/astar_planner_node/obstacle_cloud" />
-        <param name="output_topic" value="/global_path" />
-        <param name="check_step_size" value="0.1" />
-        <param name="collision_radius" value="0.09" />
+        <param name="input_topic"      value="/global_path_raw" />                  <!-- 输入: 原始稠密路径 -->
+        <!-- 障碍物点云: 来自 astar_planner_node 的 obstacle_cloud 话题 -->
+        <param name="map_topic"        value="/astar_planner_node/obstacle_cloud" />
+        <param name="output_topic"     value="/global_path" />                      <!-- 输出: 简化后路径 -->
+        <param name="check_step_size"  value="0.1" />                               <!-- 碰撞检测采样步长 (m) -->
+        <param name="collision_radius" value="0.09" />                              <!-- 碰撞判定半径 (m) -->
     </node>
 </launch>

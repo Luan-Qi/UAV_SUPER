@@ -1,17 +1,52 @@
 <launch>
+    <!-- icp_registration — 基于 ICP 的激光里程计全局地图配准 -->
+    <!--
+      功能：接收 LiDAR 点云，通过多候选初值的 ICP 配准算法将当前扫描与
+            预建 PCD 地图进行对齐，发布 map → odom 的 TF 变换。
+
+      依赖：PCL (点云库), tf2
+      用法：roslaunch uav_location icp_registration.launch  \
+                pcd_path:=/path/to/map.pcd  \
+                pointcloud_topic:=/livox/lidar/pointcloud
+
+      坐标系：map → odom → laser (由 range_odom_frame_id 定义里程计系)
+    -->
+
     <node pkg="icp_registration" type="icp_registration_node" name="icp_registration" output="screen">
+        <!-- ===== 地图文件 ===== -->
+        <!-- 预建 PCD 全局地图文件路径 -->
         <param name="pcd_path" value="$(find icp_registration)/map/map.pcd"/>
+
+        <!-- ===== 下采样体素尺寸 ===== -->
+        <!-- rough_leaf:  粗配准体素尺寸 [m]，较大以加速搜索 -->
+        <!-- refine_leaf: 精配准体素尺寸 [m]，较小以提高精度 -->
         <param name="rough_leaf_size" value="0.4"/>
         <param name="refine_leaf_size" value="0.1"/>
+
+        <!-- ===== 话题与坐标系 ===== -->
+        <!-- 输入 LiDAR 点云话题 -->
         <param name="pointcloud_topic" value="/livox/lidar/pointcloud"/>
+        <!-- map_frame:      全局固定坐标系 -->
+        <!-- odom_frame:     里程计漂移坐标系 (map_to_odom 发布到此) -->
+        <!-- range_odom_frame: 里程计源坐标系 (如 lidar_odom) -->
+        <!-- laser_frame:    LiDAR 传感器坐标系 -->
         <param name="map_frame_id" value="map"/>
         <param name="odom_frame_id" value="odom"/>
         <param name="range_odom_frame_id" value="lidar_odom"/>
         <param name="laser_frame_id" value="laser"/>
+
+        <!-- ===== 配准参数 ===== -->
+        <!-- thresh:      精配准 fitness 阈值，低于此值为配准成功 -->
+        <!-- xy_offset:   XY 方向搜索偏移步长 [m]，用于生成候选初值 -->
+        <!-- yaw_offset:  Yaw 方向搜索范围 [deg] -->
+        <!-- yaw_resolution: Yaw 方向搜索步长 [deg] -->
         <param name="thresh" value="0.15"/>
         <param name="xy_offset" value="0.2"/>
         <param name="yaw_offset" value="30.0"/>
         <param name="yaw_resolution" value="10.0"/>
+
+        <!-- ===== 初始位姿 (仅在首次扫描时使用) ===== -->
+        <!-- [x, y, z, roll, pitch, yaw] -->
         <rosparam param="initial_pose">[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</rosparam>
     </node>
 </launch>

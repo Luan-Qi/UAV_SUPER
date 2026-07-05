@@ -1,11 +1,22 @@
 <launch>
-    <arg name="x" default="0.0" />
-    <arg name="y" default="0.0" />
-    <arg name="z" default="0.0" />
-    <arg name="yaw" default="0" />
-    <arg name="pose_topic" default="/move_base_simple/goal" />
+    <!-- pub_goal — 命令行目标点发布工具 -->
+    <!--
+      功能：向指定话题发送一次 goal pose (geometry_msgs/PoseStamped) 后退出。
+      依赖：无外部话题依赖（仅发布）
+      用法：roslaunch uav_px4_ctrl goal_publisher.launch x:=2.0 y:=3.0 z:=1.0 yaw:=90
 
-    <node pkg="uav_px4_ctrl" type="pub_goal" name="pub_goal" output="screen" 
+      数据流：
+        args (x,y,z,yaw) → pub_goal → /move_base_simple/goal (单次发布)
+    -->
+
+    <!-- ===== 目标点参数 ===== -->
+    <arg name="x" default="0.0" />                   <!-- 目标 X 坐标 [m] -->
+    <arg name="y" default="0.0" />                   <!-- 目标 Y 坐标 [m] -->
+    <arg name="z" default="0.0" />                   <!-- 目标 Z 坐标 [m] -->
+    <arg name="yaw" default="0" />                   <!-- 目标偏航角 [deg] -->
+    <arg name="pose_topic" default="/move_base_simple/goal" />  <!-- 目标话题名 -->
+
+    <!-- ===== 节点 ===== -->
+    <node pkg="uav_px4_ctrl" type="pub_goal" name="pub_goal" output="screen"
           args="$(arg x) $(arg y) $(arg z) $(arg yaw) $(arg pose_topic)" />
 </launch>
-
