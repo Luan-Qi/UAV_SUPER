@@ -96,6 +96,10 @@ public:
     void resetGrid(GridNodePtr ptr);
     void resetUsedGrids();  ///< 重置所有节点搜索状态 (障碍物标记保留)
 
+    // -------- 搜索保护参数 --------
+    void setMaxSearchIterations(int max_iter);   ///< 设置最大搜索迭代次数
+    void setMaxSearchTime(double max_time);       ///< 设置最大搜索时间 (秒)
+
     // -------- 坐标转换 --------
     Eigen::Vector3d gridIndex2coord(const Eigen::Vector3i &index);
     Eigen::Vector3i coord2gridIndex(const Eigen::Vector3d &pt);
@@ -134,6 +138,10 @@ private:
     GridNodePtr terminatePtr;                     ///< 搜索终点指针 (供 getPath 回溯)
     Eigen::Vector3i goalIdx;                      ///< 终点栅格索引
     const double inf = std::numeric_limits<double>::infinity();
+
+    // -------- 搜索保护参数 --------
+    int max_search_iterations_ = 100000;          ///< 最大搜索迭代次数 (可配置)
+    double max_search_time_ = 0.5;                ///< 最大搜索时间 秒 (可配置)
 };
 
 /*

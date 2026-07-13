@@ -64,37 +64,41 @@ int main(int argc, char** argv)
     }
 
     // ============================================================
-    // 读取原始点云
+    // 读取原始点云（使用 PCLPointCloud2 保留所有字段：intensity, normal, curvature 等）
     // ============================================================
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
+    pcl::PCLPointCloud2::Ptr cloud(new pcl::PCLPointCloud2());
     if (pcl::io::loadPCDFile(input_pcd_path, *cloud) == -1) {
         ROS_ERROR_STREAM("Failed to load PCD file: " << input_pcd_path);
         ros::shutdown();
         return -1;
     }
-    ROS_INFO("Loaded point cloud: %s, total points: %zu", input_pcd_path.c_str(), cloud->size());
+    ROS_INFO("Loaded point cloud: %s, total points: %lu", input_pcd_path.c_str(),
+             static_cast<unsigned long>(cloud->width * cloud->height));
 
     // ============================================================
-    // 体素降采样
+    // 体素降采样（泛型 VoxelGrid 保留所有字段）
     // ============================================================
-    pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
+    pcl::VoxelGrid<pcl::PCLPointCloud2> voxel_filter;
     voxel_filter.setInputCloud(cloud);
     voxel_filter.setLeafSize(leaf_size, leaf_size, leaf_size);  ///< 3D 体素尺寸 [m]
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
+    pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
     voxel_filter.filter(*cloud_filtered);
 
-    ROS_INFO("Downsampling complete: %zu -> %zu", cloud->size(), cloud_filtered->size());
+    ROS_INFO("Downsampling complete: %lu -> %lu",
+             static_cast<unsigned long>(cloud->width * cloud->height),
+             static_cast<unsigned long>(cloud_filtered->width * cloud_filtered->height));
 
     // ============================================================
-    // 保存降采样后的点云
+    // 保存降采样后的点云（保留所有原始字段）
     // ============================================================
     std::filesystem::path input_path(input_pcd_path);
     std::string stem = input_path.stem().string();               ///< 文件名（无扩展名）
     std::string ext = input_path.extension().string();           ///< 扩展名
     std::filesystem::path output_path = input_path.parent_path() / (stem + "_downsampled" + ext);
 
-    pcl::io::savePCDFileBinary(output_path.string(), *cloud_filtered);
+    pcl::PCDWriter writer;
+    writer.writeBinary(output_path.string(), *cloud_filtered);
     ROS_INFO("Downsampled point cloud saved to: %s", output_path.c_str());
 
     // ============================================================
@@ -102,7 +106,7 @@ int main(int argc, char** argv)
     // ============================================================
     ros::Publisher pub = nh.advertise<sensor_msgs::PointCloud2>("/downsampled_cloud", 1, true);
     sensor_msgs::PointCloud2 msg;
-    pcl::toROSMsg(*cloud_filtered, msg);
+    pcl_conversions::fromPCL(*cloud_filtered, msg);
     msg.header.frame_id = "map";
 
     ROS_INFO("Published downsampled point cloud to /downsampled_cloud");

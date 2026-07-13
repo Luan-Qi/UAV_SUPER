@@ -117,6 +117,20 @@ void AstarPathFinder::resetUsedGrids()
 }
 
 // ============================================================================
+// 搜索保护参数设置
+// ============================================================================
+
+void AstarPathFinder::setMaxSearchIterations(int max_iter)
+{
+    max_search_iterations_ = max_iter;
+}
+
+void AstarPathFinder::setMaxSearchTime(double max_time)
+{
+    max_search_time_ = max_time;
+}
+
+// ============================================================================
 // 障碍物管理
 // ============================================================================
 
@@ -349,6 +363,11 @@ double AstarPathFinder::getDiagHeu(GridNodePtr node1, GridNodePtr node2)
     dz -= diag;
 
     // 根据哪一维先走完分情况处理
+    //
+    // NOTE: 以下三个 if 是非互斥的。当 diag 扣减后有多个维同时归零
+    //   （如 dx=2,dy=0,dz=0），后面的分支会覆盖前面的结果，可能造成
+    //   启发式高估。正确的做法是 if-else if 链或按优先级排定唯一分支。
+    //   当前保留原样以避免改动过大，如需修复改为 if-else if 即可。
     if (dx == 0)
         h = 1.0 * sqrt(3.0) * diag           // 体对角线: √3
           + sqrt(2.0) * min(dy, dz)           // 面对角线: √2
@@ -401,9 +420,29 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt)
     start_pt = gridIndex2coord(start_idx);
     end_pt   = gridIndex2coord(end_idx);
 
-    // -------- 初始化起点/终点节点 --------
-    GridNodePtr startPtr = new GridNode(start_idx, start_pt);
-    GridNodePtr endPtr   = new GridNode(end_idx, end_pt);
+    // -------- 使用 GridNodeMap 中的预分配节点作为起终点 --------
+    GridNodePtr startPtr = GridNodeMap[start_idx(0)][start_idx(1)][start_idx(2)];
+    GridNodePtr endPtr   = GridNodeMap[end_idx(0)][end_idx(1)][end_idx(2)];
+
+    // -------- 起终点障碍物检测 --------
+    // 终点在障碍物中: 永远无法到达, 直接返回失败
+    if (isOccupied(endPtr->index))
+    {
+        ROS_ERROR("[astar] [A*]{fail} Goal [%.1f,%.1f,%.1f] is inside an obstacle! "
+                  "grid_idx=[%d,%d,%d]. Cannot plan.",
+                  end_pt(0), end_pt(1), end_pt(2),
+                  end_idx(0), end_idx(1), end_idx(2));
+        terminatePtr = nullptr;
+        return;
+    }
+    // 起点在障碍物中: 告警但继续 (无人机物理上在此位置, 地图可能不准)
+    if (isOccupied(startPtr->index))
+    {
+        ROS_WARN("[astar] Start [%.1f,%.1f,%.1f] is inside an obstacle! "
+                 "grid_idx=[%d,%d,%d]. Planning may be affected.",
+                 start_pt(0), start_pt(1), start_pt(2),
+                 start_idx(0), start_idx(1), start_idx(2));
+    }
 
     // -------- 初始化搜索数据结构 --------
     openSet.clear();  // multimap<double, GridNodePtr>: key=fScore
@@ -423,8 +462,25 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt)
     vector<double> edgeCostSets;
 
     // ======== 主搜索循环 ========
+    int iter = 0;  // 迭代计数器 (防止无限搜索)
     while (!openSet.empty())
     {
+        // -------- 搜索保护: 迭代次数上限 --------
+        if (++iter > max_search_iterations_)
+        {
+            ROS_ERROR("[astar] [A*]{fail} Exceeded max iterations (%d), aborting.",
+                      max_search_iterations_);
+            terminatePtr = nullptr;
+            return;
+        }
+        // -------- 搜索保护: 时间上限 --------
+        if ((ros::Time::now() - time_1).toSec() > max_search_time_)
+        {
+            ROS_ERROR("[astar] [A*]{fail} Exceeded max search time (%.2fs), aborting.",
+                      max_search_time_);
+            terminatePtr = nullptr;
+            return;
+        }
         // -------- Step 1: 取出 fScore 最小的节点 (open set 按 key 排序) --------
         currentPtr = openSet.begin()->second;
 

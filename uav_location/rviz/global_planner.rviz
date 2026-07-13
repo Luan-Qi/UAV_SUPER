@@ -7,11 +7,15 @@ Panels:
         - /drone01/Mapping1
         - /drone01/Mapping1/map inflate1
       Splitter Ratio: 0.4403225779533386
-    Tree Height: 427
+    Tree Height: 209
   - Class: rviz/Views
     Expanded:
       - /Current View1
     Name: Views
+    Splitter Ratio: 0.5
+  - Class: rviz/Tool Properties
+    Expanded: ~
+    Name: Tool Properties
     Splitter Ratio: 0.5
 Preferences:
   PromptSaveOnExit: true
@@ -125,8 +129,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 2.764524459838867
-        Min Value: -0.7580187320709229
+        Max Value: 2.5058577060699463
+        Min Value: -0.5379423499107361
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -290,16 +294,17 @@ Visualization Manager:
         base_link:
           base_link_frd:
             {}
+        map:
+          camera_init:
+            body:
+              {}
+          map_ned:
+            {}
+          world:
+            {}
         odom:
           odom_ned:
             {}
-        world:
-          map:
-            camera_init:
-              body:
-                {}
-            map_ned:
-              {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -401,7 +406,7 @@ Visualization Manager:
             - Alpha: 1
               Autocompute Intensity Bounds: true
               Autocompute Value Bounds:
-                Max Value: 2.940000057220459
+                Max Value: 2.740000009536743
                 Min Value: 0.03999999910593033
                 Value: true
               Axis: Z
@@ -444,6 +449,13 @@ Visualization Manager:
     - Class: rviz/PublishPoint
       Single click: true
       Topic: /clicked_point
+    - Class: rviz/SetGoal
+      Topic: /move_base_simple/goal
+    - Class: rviz/SetInitialPose
+      Theta std deviation: 0.2617993950843811
+      Topic: initialpose
+      X std deviation: 0.5
+      Y std deviation: 0.5
   Value: true
   Views:
     Current:
@@ -456,27 +468,29 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.729904055595398
-        Y: -0.6376553177833557
-        Z: -0.45057785511016846
+        X: 0.24028316140174866
+        Y: -0.4642350971698761
+        Z: -0.43568509817123413
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7497954368591309
-      Target Frame: <Fixed Frame>
-      Yaw: 2.3949968814849854
+      Pitch: 0.7697955369949341
+      Target Frame: body
+      Yaw: 0.7999964356422424
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1016
+  Height: 656
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000001000000000000026e0000039efc0200000003fb000000100044006900730070006c006100790073010000003d0000022e000000c900fffffffb0000000a0056006900650077007301000002710000016a000000a400fffffffb0000000a006400650070007400680000000310000000cb0000000000000000000004c60000039e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000001000000000000017000000236fc0200000004fb000000100044006900730070006c006100790073010000003d00000154000000c900fffffffb0000000a005600690065007700730100000197000000dc000000a400fffffffb0000000a006400650070007400680000000310000000cb0000000000000000fb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000001ea000000890000005c00ffffff000003440000023600000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Tool Properties:
+    collapsed: false
   Views:
     collapsed: false
-  Width: 1850
+  Width: 1210
   X: 70
   Y: 27

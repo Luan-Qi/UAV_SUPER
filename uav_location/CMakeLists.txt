@@ -30,17 +30,17 @@ include_directories(
   ${EIGEN3_INCLUDE_DIRS}
 )
 
-# add_executable(fast_lio_localization src/global_localization.cpp)
-# target_link_libraries(fast_lio_localization ${catkin_LIBRARIES} fast_gicp)
-# add_dependencies(fast_lio_localization ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(fast_lio_localization src/global_localization.cpp)
+target_link_libraries(fast_lio_localization ${catkin_LIBRARIES} fast_gicp)
+add_dependencies(fast_lio_localization ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-# add_executable(publish_initial_pose src/publish_initial_pose.cpp)
-# target_link_libraries(publish_initial_pose ${catkin_LIBRARIES})
-# add_dependencies(publish_initial_pose ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(publish_initial_pose src/publish_initial_pose.cpp)
+target_link_libraries(publish_initial_pose ${catkin_LIBRARIES})
+add_dependencies(publish_initial_pose ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-# add_executable(transform_fusion src/transform_fusion.cpp)
-# target_link_libraries(transform_fusion ${catkin_LIBRARIES})
-# add_dependencies(transform_fusion ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(transform_fusion src/transform_fusion.cpp)
+target_link_libraries(transform_fusion ${catkin_LIBRARIES})
+add_dependencies(transform_fusion ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 # ---- fast_ofio: Fast Optical-Flow Inertial Odometry ----
 add_executable(fast_ofio

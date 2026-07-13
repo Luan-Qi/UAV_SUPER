@@ -38,12 +38,13 @@
     <!-- single_run_in_exp: 实验模式，无全局参考路径，纯局部探索/避障 -->
     <include file="$(find ego_planner)/launch/single_run_in_exp.launch" >
         <arg name="odom_topic" value="$(arg local_Odometry)"/>
+        <arg name="cloud_topic" value="/cloud_registered"/>
     </include>
 
     <!-- ===== 静态 TF: world → camera_init ===== -->
     <!-- 对齐 FAST-LIO 的 camera_init 坐标系与世界系 -->
     <node pkg="tf2_ros" type="static_transform_publisher" name="my_static_tf_publisher"
-          args="0 0 0 0 0 0 world camera_init" />
+          args="0 0 0 0 0 0 map camera_init" />
 
     <!-- ===== 任务管理器 ===== -->
     <!-- 管理航点序列与任务状态机 -->

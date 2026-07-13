@@ -229,6 +229,8 @@ int main(int argc, char **argv)
     std::string goal_pose_topic;
     std::string planned_path_topic;
     std::string odometry_topic;
+    int max_search_iter;
+    double max_search_time;
 
     nh.param<std::string>("octomap_topic",       octomap_topic,       "/octomap_full");
     nh.param<std::string>("start_pose_topic",    start_pose_topic,    "/start_pose");
@@ -238,11 +240,35 @@ int main(int argc, char **argv)
     nh.param<int>        ("inflater_size",        inflater_size,       2);
     nh.param<int>        ("planning_mode",        planning_mode,       0);
     nh.param<std::string>("odometry_topic",       odometry_topic,      "/odometry");
+    nh.param<int>        ("max_search_iterations", max_search_iter,   100000);
+    nh.param<double>     ("max_search_time",       max_search_time,   0.5);
+
+    // 设置搜索保护参数到 A* 搜索器
+    astar.setMaxSearchIterations(max_search_iter);
+    astar.setMaxSearchTime(max_search_time);
 
     // -------- 初始化订阅 --------
     ros::Subscriber octo_sub  = nh.subscribe(octomap_topic,    10, octomapCallback);
     ros::Subscriber start_sub = nh.subscribe(start_pose_topic, 10, startCallback);
     ros::Subscriber goal_sub  = nh.subscribe(goal_pose_topic,  10, goalCallback);
+
+    // -------- 打印当前规划模式 --------
+    switch (planning_mode)
+    {
+        case 0:
+            ROS_INFO("[astar] Planning mode: 0 (standard) - each plan requires new start + goal");
+            break;
+        case 1:
+            ROS_INFO("[astar] Planning mode: 1 (continuous) - goal becomes next start");
+            break;
+        case 2:
+            ROS_INFO("[astar] Planning mode: 2 (odometry) - current odometry used as start");
+            break;
+        default:
+            ROS_WARN("[astar] Unknown planning_mode=%d, falling back to mode 0", planning_mode);
+            planning_mode = 0;
+            break;
+    }
 
     // 模式2: 订阅里程计话题以持续获取当前位姿
     ros::Subscriber odom_sub;
@@ -274,6 +300,8 @@ int main(int argc, char **argv)
     while (ros::ok())
     {
         ros::spinOnce();  // 处理所有回调队列
+        
+        if(have_start && have_goal && !have_octomap) ROS_WARN_THROTTLE(1.0, "[astar] Check your octomap!");
 
         // 触发条件: 起点 + 终点 + 地图 三者齐全
         if (have_start && have_goal && have_octomap)
@@ -358,3 +386,4 @@ int main(int argc, char **argv)
 
     return 0;
 }
+

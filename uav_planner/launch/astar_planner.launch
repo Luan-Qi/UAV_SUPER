@@ -34,7 +34,11 @@
     <!-- 2 = 里程计模式: 持续采集 odometry, 收到终点时以当前位姿作为起点 -->
     <arg name="planning_mode" default="0" />
     <!-- 模式2所需的里程计话题 (仅 planning_mode=2 时生效) -->
-    <arg name="odometry_topic" default="/odometry" />
+    <arg name="odometry_topic" default="/Odometry" />
+
+    <!-- ====== 搜索保护 ====== -->
+    <arg name="max_search_iterations" default="1000000" />            <!-- 最大搜索迭代次数 -->
+    <arg name="max_search_time"       default="1.0" />               <!-- 最大搜索时间 (秒) -->
 
     <!-- ====== A* 规划器节点 ====== -->
     <node pkg="uav_planner" type="astar_planner_node" name="astar_planner_node" output="screen">
@@ -46,6 +50,8 @@
         <param name="inflater_size"         value="$(arg inflater_size)" />
         <param name="planning_mode"         value="$(arg planning_mode)" />
         <param name="odometry_topic"        value="$(arg odometry_topic)" />
+        <param name="max_search_iterations" value="$(arg max_search_iterations)" />
+        <param name="max_search_time"       value="$(arg max_search_time)" />
     </node>
 
     <!-- ====== 可选: 路径坐标系变换节点 (按需启用) ====== -->
