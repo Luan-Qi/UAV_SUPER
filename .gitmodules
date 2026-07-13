@@ -1,0 +1,9 @@
+[submodule "EGOX_Planner"]
+	path = EGOX_Planner
+	url = https://github.com/Luan-Qi/EGOX_Planner.git
+[submodule "FAST_LIO_UWB"]
+	path = FAST_LIO_UWB
+	url = https://github.com/Luan-Qi/FAST_LIO_UWB.git
+[submodule "tracking_controller"]
+	path = tracking_controller
+	url = https://github.com/Zhefan-Xu/tracking_controller.git
