@@ -302,13 +302,25 @@ UAV-Super/
 - **路径后处理**: 简化 (Douglas-Peucker + greedy) + 平滑 (Bezier + 离散曲线优化)
 - **路径跟随**: fast / fforward / visual 三种跟随器
 
-### 控制: uav_px4_ctrl + tracking_controller
+### 控制 uav_px4_ctrl OR tracking_controller
 
-- **SO3 几何控制器**: 四旋翼姿态+推力非线性控制，3 种控制模式 (position/velocity/attitude)
-- **mission_manger**: 航点序列管理，支持到达判定、悬停等待、录像控制、planner 失败重试
-- **tracking_controller** (CATKIN_IGNORE): VINS 视觉目标跟踪 (KCF + B 样条轨迹)，起飞/悬停/圆形跟踪
+项目提供两套 PX4 控制方案，根据任务复杂度选用。日常飞行推荐 `uav_px4_ctrl`。
 
-### 配准: fast_gicp
+| | uav_px4_ctrl（简单控制） | tracking_controller（复杂控制） |
+|---|---|---|
+| **定位** | 日常自主飞行 | 视觉目标跟踪、高精度轨迹跟踪 |
+| **核心节点** | `px4ctrl` — MAVROS offboard 桥接（ENU→NED 坐标修正）<br>`mission_manger` — 航点序列任务管理 | `tracking_controller_node` — PID 跟踪 + 卡尔曼推力估计<br>`flightBase` — SO3 几何控制器 + B 样条轨迹 |
+| **控制方式** | MAVROS position / velocity / attitude setpoint | SO3 姿态推力 + 加速度前馈 + body rate |
+| **航点** | 多航点序列、到达判定、悬停等待、录像控制、planner 失败重试（最多 3 次） | 起降、悬停、圆形轨迹跟踪 |
+| **RC 状态机** | 7 通道遥控器，arm / mode / gear 开关 | 无 |
+| **依赖** | MAVROS | MAVROS + VINS 视觉里程计 |
+| **状态** | ✅ 默认方案，已编译 | CATKIN_IGNORE，未编译 |
+
+**uav_px4_ctrl** 通过 MAVROS 直接向飞控发送 setpoint 指令，逻辑简单可靠，覆盖绝大多数飞行场景。
+
+**tracking_controller** 在飞控上层自行解算 SO3 姿态和推力，配合 B 样条轨迹生成实现高精度跟踪，适合需要视觉伺服或动态目标跟踪的场景。需移除 `CATKIN_IGNORE` 后编译启用。
+
+### 点云配准库: fast_gicp（已弃用）
 
 高性能点云配准库，支持 FastGICP / FastVGICP / FastVGICPCuda / NDTCuda 多种实现，用于 ICP 重定位等场景。
 
