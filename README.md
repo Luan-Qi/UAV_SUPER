@@ -49,7 +49,9 @@ UAV autonomous driving system — LiDAR-inertial localization, global/local plan
 ### 1. 编译
 
 ```bash
-cd UAV-Super
+mkdir -p UAV_SUPER/src
+git clone --recursive https://github.com/Luan-Qi/UAV_SUPER.git src/
+
 catkin_make -j
 source devel/setup.bash
 ```
@@ -66,16 +68,26 @@ bash shfile/uav_super_interfance.sh
 
 ### 3. 建图模式
 
-手动遥控飞行采集点云，通过 FAST-LIO SLAM 实时建图。**及时备份 PCD 文件以免覆盖**。
+**手持**无人机或**手动遥控**飞行采集点云，通过 FAST-LIO SLAM 实时建图。
+
+点云文件默认位于`src/FAST_LIO_UWB/PCD/scan.pcd`。**及时备份 PCD 文件以免覆盖**。
 
 ```bash
 bash shfile/uav_super_mapping.sh
 # 等价于 roslaunch uav_location local_mapping.launch
 ```
 
+自动生成的PCD点云一般比较大，建议使用`uav_util/pcd_downsample_node`节点进行降采样，减少后续节点运行压力。**经验显示 `0.05-0.10` 叶子尺寸的降采样就够了**
+
+```bash
+roslaunch uav_util pcd_downsample.launch pcd_path:=/path/to/scan.pcd leaf_size:=0.05
+```
+
 ### 4. 自动飞行模式（已知全局地图）
 
 需要提前准备好 `map.pcd` 并在 launch 文件中设置航点序列、停留时间等参数。
+
+推荐使用[Mission-Generator](https://github.com/Luan-Qi/Mission-Generator)进行点云的查看和航点的配置，软件可以自动生成配置参数，放到launch文件中对应位置即可，具体请参考 Mission-Generator 的使用文档。
 
 ```bash
 bash shfile/uav_super_main.sh
@@ -86,15 +98,20 @@ bash shfile/uav_super_main.sh
 1. 无人机完成全局重定位（若启动时无法完成，手动晃动无人机）
 2. 切换到 Offboard 模式，自动飞行开关拨到高位
 3. RC 主动解锁后，无人机自动执行航点序列
-4. **发生意外须立即手动接管**
+4. 无人机自动起飞并开始巡航，到达终点后手动关闭自动飞行开关，自动降落
+5. **发生意外须立即手动接管**
 
 ### 5. 仿真模式
+
+用于验证航点和规划算法可行性，不涉及定位和PX4控制部分。
 
 ```bash
 roslaunch uav_location global_planner_in_sim.launch
 ```
 
-### 6. 局部探索模式（无全局地图）
+### 6. 局部探索模式（未完成，请勿使用）
+
+无人机使用局部定位在未知地图上进行探索，自动生成全局地图。
 
 ```bash
 bash shfile/uav_super_explorer.sh
@@ -114,7 +131,7 @@ bash shfile/uav_super_explorer.sh
 
 ---
 
-## 系统测试脚本
+## 系统测试脚本[UAV_SUPER_shfile](https://github.com/Luan-Qi/UAV_SUPER_shfile)
 
 | 脚本 | 用途 |
 |------|------|
@@ -127,6 +144,24 @@ bash shfile/uav_super_explorer.sh
 | `shfile/uav_super_test_position.sh` | 位置控制测试 (FAST-LIO + px4ctrl) |
 | `shfile/test_path.sh` | 路径规划测试 (发布测试 Path) |
 | `shfile/test_takeoff.sh` | 起飞服务调用测试 |
+
+---
+
+## 从零开始测试清单
+
+首次部署或久置后复飞时，按以下顺序逐项验证，确保每一步通过后再进入下一步。
+
+| 步骤 | 脚本 / 命令 | 验证目标 | 通过标准 |
+|:---:|---|---|---|
+| **1** | `bash shfile/uav_super_interfance.sh` | 传感器与飞控连接 | MAVROS 显示飞控心跳正常；`rostopic hz /livox/imu` 有稳定输出；相机图像正常 |
+| **2** | `bash shfile/uav_super_test_position.sh` | 定位建图与 PX4 位置控制 | FAST-LIO 里程计正常输出 `/Odometry`；RViz 中点云与 odom 轨迹一致；RC 切 POSITION 模式后无人机可稳定悬停并响应摇杆移动 |
+| **3** | `bash shfile/uav_super_test_local.sh` | 局部避障 | EGO Planner 可在简单障碍物环境中生成避障轨迹；无人机按轨迹飞行不碰撞 |
+| **4** | `bash shfile/uav_super_mapping.sh` | 全局地图构建 | 手持/手动飞行采集完整环境点云；`roslaunch uav_util pcd_downsample.launch` 降采样（推荐 leaf_size 0.05–0.10）；生成 `.pcd` 文件备用 |
+| **5** | Mission-Generator | 航点规划 | 在点云地图上配置航点序列、停留时间、录像控制等参数；导出 launch 配置 |
+| **6** | `roslaunch uav_location global_planner_in_sim.launch` | 航线可行性 | 仿真环境中路径规划成功；A* 全局路径 + EGO 局部轨迹均无碰撞；航点序列可全部到达 |
+| **7** | `bash shfile/uav_super_main.sh` | 正式自主飞行 | 全局重定位成功；Offboard 解锁后自动起飞并按航点巡航；全程无异常；**随时准备手动接管** |
+
+> **原则**: 每步失败都应排查并修复后再继续，不要跳过中间步骤直接飞行。
 
 ---
 
